@@ -13,12 +13,14 @@ import batchupload.csv_methods as csv_methods
 from batchupload.make_info import MakeBaseInfo
 import os
 import pywikibot
+import pywikibot.data.sparql as sparql
 
 OUT_PATH = u'connections'
 BATCH_CAT = u'Media contributed by Nationalmuseum Stockholm‎'
 BATCH_DATE = u'2016-10'
 BASE_NAME = u'artwork'
 COLLECTION = u'Nationalmuseum'
+LANGUAGE_PRIORITY = ('_', 'en', 'sv')
 
 
 class NatmusInfo(MakeBaseInfo):
@@ -31,8 +33,13 @@ class NatmusInfo(MakeBaseInfo):
         @param batch_cat: base_name for maintanance categories
         @param batch_label: label for this particular batch
         """
+        # load wikidata info
+        self.wd_paintings = NatmusInfo.load_painting_items()
+
         # handle nsid connections
         self.nsid = {}
+        self.uri_ids = {}
+        self.load_place_mappings()
 
         # black-listed values
         self.bad_namn = tuple()  # Artist names which actually mean unknown
@@ -43,6 +50,17 @@ class NatmusInfo(MakeBaseInfo):
 
         super(NatmusInfo, self).__init__(BATCH_CAT, BATCH_DATE)
 
+    @staticmethod
+    def test():
+        #@todo: kill
+        data = NatmusInfo.load_painting_items()
+        i=0
+        for k, v in data.iteritems():
+            if i > 10:
+                break
+            i += 1
+            print k, v
+
     def log(self, text):
         """
         Add text to logger.
@@ -50,6 +68,82 @@ class NatmusInfo(MakeBaseInfo):
         @param text: text to log
         """
         self.logger.append(text)
+
+    def load_place_mappings(self):
+        """Store hard coded list of place to wikidata mappings."""
+        self.place_mappings = {
+            u'Moskva': 'Q649',
+            u'Kina': 'Q29520',
+            u'Leiden': 'Q43631',
+            u'Frankrike': 'Q142',
+            u'Haarlem': 'Q9920',
+            u'Danmark': 'Q35',
+            u'München': 'Q1726',
+            u'Paris': 'Q90',
+            u'Italien': 'Q38',
+            u'England': 'Q21',
+            u'Sverige': 'Q34',
+            u'Stockholm': 'Q1754',
+            u'Jämtland': 'Q211661',
+            u'Fontainebleau': 'Q182872',
+            u'Florens': 'Q2044',
+            u'Nederländerna': 'Q55',
+            u'Rom': 'Q220',
+            u'Antwerpen': 'Q12892',
+        }
+
+    @staticmethod
+    def clean_sparql_output(data, key):
+        """
+        Takes the sparql output and outputs it as a dict with lists.
+
+        Also converts any entity_urls to Qids.
+
+        @param data: data to clean
+        @param key: data value to use as key in the new dict
+        @return: dict
+        """
+        entity_url = u'http://www.wikidata.org/entity/'
+        if key not in data[0].keys():
+            pywikibot.error(
+                u"The expected key '%s' was not present in the sparql output "
+                u"keys: %s" % (key, ', '.join(data[0].keys())))
+        new_data = {}
+        for d in data:
+            k = d[key]
+            new_data[k] = {}
+            for kk, value in d.iteritems():
+                value = value.split('|')
+                for i, v in enumerate(value):
+                    value[i] = v.replace(entity_url, '')
+                new_data[k][kk] = value
+        return new_data
+
+    @staticmethod
+    def load_painting_items():
+        """Store all natmus paintings in Wikidata."""
+        query = u'''\
+# Nationalmuseum import
+SELECT ?item ?obj_id (group_concat(distinct ?type;separator="|") as ?types) (group_concat(distinct ?creator;separator="|") as ?creators) (group_concat(distinct ?depicted_person;separator="|") as ?depicted_persons)
+WHERE
+{
+  ?item wdt:P2539 ?obj_id .
+  OPTIONAL {
+    ?item wdt:P31 ?type .
+  }
+  OPTIONAL {
+    ?item wdt:P170 ?creator .
+  }
+  OPTIONAL {
+    ?item wdt:P180 ?depicted_person .
+    ?depicted_person wdt:P31 wd:Q5 .
+  }
+}
+group by ?item ?obj_id
+'''
+        s = sparql.SparqlQuery()
+        data = s.select(query)
+        return NatmusInfo.clean_sparql_output(data, 'obj_id')
 
     def load_data(self, in_file):
         """
@@ -103,10 +197,125 @@ class NatmusInfo(MakeBaseInfo):
                     u"%s had multiple matching images: %s"
                     % (key, ', '.join(matches)))
             else:
-                d[key] = NatmusItem.make_item_from_raw(
-                    value, matches.pop(), self)
+                try:
+                    d[key] = NatmusItem.make_item_from_raw(
+                        value, matches.pop(), self)
+                except common.MyError as e:
+                    self.log(e)
 
+        pywikibot.output(
+            "Identified %d valid paintings of %d records" %
+            (len(d), len(lido_data)))
         self.data = d
+
+    @staticmethod
+    def get_institution(item):
+        """
+        Identify institution and subcollection based on filename.
+
+        @param item: the metadata for the media file in question
+        @return: str
+        """
+        institution = u'{{Institution:Nationalmuseum Stockholm}}'
+        sub_collection = item.get_subcollection()
+        if sub_collection:
+            institution += u'\n |department           = %s' % sub_collection['link']
+        return institution
+
+    def get_creation_place(self, item):
+        """
+        Return a formatted list of creation places.
+
+        @param item: the metadata for the media file in question
+        @return: str
+        """
+        places = item.get_creation_place()
+        if not places:
+            return ''
+
+        # find the correctly formatted placenames
+        city_links = []
+        for p in places:
+            p = p.split('(')[0].strip()  # input is "place (country)"
+            qid = self.place_mappings.get(p)
+            if qid:
+                city_links.append(u'{{city|%s}}' % qid)
+
+        return ', '.join(city_links)
+
+    def get_depicted(self, item):
+        """
+        Return a formatted list of linked depicted people.
+
+        @param item: the metadata for the media file in question
+        @return: str
+        """
+        depicted = item.get_depicted()
+
+        if not depicted:
+            return ''
+
+        # identify links related to names
+        linked_objects = []
+        #@todo
+        # something to get links (wikidata or commons) from the returned list
+        return u'{{depicted person|%s|style=information field}} ' % \
+            '|'.join(linked_objects)
+
+    @staticmethod
+    def get_original_description(item):
+        """
+        Return the description wrapped in an original descriiption template.
+
+        @param item: the metadata for the media file in question
+        @return: str
+        """
+        descr = item.get_description()
+        if descr:
+            return u'{{Information field' \
+                   u'|name={{original caption/i18n|header}}' \
+                   u'|value=%s}}' % descr
+
+    def get_qid(self, item):
+        """
+        Get the wikidata id for an item.
+
+        @param item: the metadata for the media file in question
+        @return: str
+        """
+        qid = ''
+        wd_data = self.wd_paintings.get(item.get_obj_id())
+        if wd_data:
+            qid = wd_data.get('item')[0]
+        return qid
+
+    def get_type(self, item):
+        """
+        Get the object type of an item.
+
+        @param item: the metadata for the media file in question
+        @return: str
+        """
+        typ = ''
+        mappings = {  # per Template:I18n/objects
+            'Q132137': 'icon',
+            'Q3305213': 'painting'
+        }
+
+        # get previous wikidata info
+        wd_data = self.wd_paintings.get(item.get_obj_id())
+        if wd_data:
+            types = []
+            for t in wd_data.get('types'):
+                types.append(mappings.get(t))
+            types = common.trim_list(types)
+            if len(types) == 1:
+                typ = types[0]
+            elif len(types) > 1:
+                pywikibot.warning(
+                    "Found %d matching types for %s" %
+                    (len(types), item.get_obj_id()))
+        return typ
 
     def make_info_template(self, item):
         """
@@ -115,7 +324,44 @@ class NatmusInfo(MakeBaseInfo):
         @param item: the metadata for the media file in question
         @return: str
         """
-        pass
+        data = {
+            'depicted': self.get_depicted(item),
+            'artist': None,  #@todo
+            'title': item.get_title(),
+            'wikidata': self.get_qid(item),
+            'type': self.get_type(item),
+            'description': item.get_description(),
+            'original_description': NatmusInfo.get_original_description(item),
+            'date': None,  #@todo
+            'medium': None,  #@todo
+            'dimension': item.get_dimensions(),
+            'institution': NatmusInfo.get_institution(item),
+            'inscriptions': item.get_inscription(),
+            'id_link': item.get_id_link(),
+            'creation_place': self.get_creation_place(item),
+            'source': item.get_source(),
+            'permission': None,  #@todo
+        }
+        return u'''\
+{{Artwork
+ |other_fields_1       = {depicted}
+ |artist               = {artist}
+ |title                = {title}
+ |wikidata             = {wikidata}
+ |object_type          = {type}
+ |description          = {description}
+ |other_fields_2       = {original_description}
+ |date                 = {date}
+ |medium               = {medium}
+ |dimensions           = {dimension}
+ |institution          = {institution}
+ |inscriptions         = {inscriptions}
+ |accession number     = {id_link}
+ |place of creation    = {creation_place}
+ |source               = {source}
+ |permission           = {permission}
+ |other_versions       =
+}}'''.format(**data)
 
     def generate_filename(self, item):
         """
@@ -137,6 +383,7 @@ class NatmusInfo(MakeBaseInfo):
         @param item: the metadata for the media file in question
         @return: list of categories (without "Category:" prefix)
         """
+        #@todo
         pass
 
     def generate_meta_cats(self, item, content_cats):
@@ -147,19 +394,28 @@ class NatmusInfo(MakeBaseInfo):
         @param content_cats: any content categories for the file
         @return: list of categories (without "Category:" prefix)
         """
+        cats = []
+        # main cats
+        cats.append(u'Paintings in the Nationalmuseum Stockholm')
+        cats.append(self.batch_cat)
+
+        # sub-collection cat
+        sub_collection = item.get_subcollection()
+        if sub_collection:
+            cats.append(sub_collection['cat'])
+
+        #@todo
+        #something if depicted should be mapped
         pass
 
     def get_original_filename(self, item):
         """
-        Return the original filename of a media file.
-
-        This can either consist of returning a particular data field or require
-        processing the metadata.
+        Return the original filename of a media file without file extension.
 
         @param item: the metadata for the media file in question
         @return: str
         """
-        return item.image
+        return os.path.splitext(item.image)[0]
 
     def run(self, in_file, base_name=None):
         """Overload run to add log outputting."""
@@ -245,6 +501,11 @@ class NatmusItem(object):
         @return: NatmusItem
         """
         d = entry.copy()
+        # skip paintings not in wikidata
+        if d['obj_id'] not in natmus_info.wd_paintings.keys():
+            raise common.MyError(
+                u"skip_4: "
+                u"%s did not have any associated wikidata entry" % d['obj_id'])
 
         # add specific image info
         d['image'] = image_file
@@ -263,6 +524,23 @@ class NatmusItem(object):
 
         return NatmusItem(d)
 
+    @staticmethod
+    def language_wrapped_list(attribute):
+        """
+        Return a language wrapped list for a given attribute.
+
+        @param attribute: the attribute to analyse
+        @return: str
+        """
+        values = []
+        for lang in LANGUAGE_PRIORITY:
+            if lang in attribute.keys():
+                value = attribute[lang]
+                if lang != '_':
+                    value = u'{{%s|%s}}' % (lang, value)
+                values.append(value)
+        return u' '.join(values)
+
     def get_named_creator(self):
         """
         Establish the named creator(s) for use in title.
@@ -279,7 +557,6 @@ class NatmusItem(object):
             if 'qualifier' not in v.keys() or v.get('qualifier') == 'P1773':
                 named_creators.append(v.get('name'))
 
-        if named_creators: print named_creators
         return ' & '.join(named_creators)
 
     def generate_filename_descr(self):
@@ -288,11 +565,12 @@ class NatmusItem(object):
 
         This is made with the title (according to language priority)
         and the named creator(s).
+
+        @return: str
         """
         # determine title
-        language_priority = ('_', 'en', 'sv')
         title = None
-        for lang in language_priority:
+        for lang in LANGUAGE_PRIORITY:
             if lang in self.title.keys():
                 title = self.title[lang]
                 break
@@ -304,6 +582,93 @@ class NatmusItem(object):
             return u'%s (%s)' % (title, named_creators)
         return title
 
+    def get_obj_id(self):
+        """Return the obj_id."""
+        return self.obj_id
+
+    def get_title(self):
+        """Return language wrapped titles."""
+        return NatmusItem.language_wrapped_list(self.title)
+
+    def get_description(self):
+        """Return language wrapped descriptions."""
+        return NatmusItem.language_wrapped_list(self.descriptions)
+
+    def get_inscription(self):
+        """Return language wrapped inscriptions."""
+        return NatmusItem.language_wrapped_list(self.inscriptions)
+
+    def get_depicted(self):
+        """Return list of subjects on the image."""
+        return self.subjects
+
+    def get_source(self):
+        """Given an item produce a source statement."""
+        if self.photographer:
+            return u'%s / %s' % (self.photographer, COLLECTION)
+        else:
+            return COLLECTION
+
+    def get_dimensions(self):
+        """Return formatted dimensions."""
+        measures = []
+        for k, v in self.measurements.iteritems():
+            data = {
+                'unit': v['unit'],
+                'width': v['width'] or '',
+                'height': v['height'] or '',
+                'depth': v['depth'] or '',
+            }
+            measure = ''
+            if k != '_':
+                measure = u'{{en|%s}}: ' % k
+            measure += u'{{Size|' + \
+                u'unit={unit}|width={width}|height={height}|depth={depth}'.format(**data) + \
+                u'}}'
+            measures.append(measure)
+        if not measures:
+            return ''
+        elif len(measures) == 1:
+            return measures[0]
+        else:
+            return u'\n* %s' % '\n* '.join(measures)
+
+    def get_creation_place(self):
+        """Return a list of creation places in Swedish."""
+        if not self.creation_place:
+            return []
+        elif self.creation_place.keys() != ['sv']:
+            pywikibot.warning(
+                "Found unexpected creation_place language: %s" %
+                ', '.join(self.creation_place.keys()))
+            return []
+        else:
+            return self.creation_place['sv'].split(', ')
+
+    def get_id_link(self):
+        """Format an accession number link."""
+        return u'{{Nationalmuseum Stockholm link |1=%s |2=%s }}' % \
+            (self.obj_id, self.inv_nr)
+
+    def get_subcollection(self):
+        """Identify subcollection based on filename."""
+        mappings = {
+            "TiP": {
+                'link': u'{{Institution:Institut_Tessin}}',
+                'cat': u'Centre culturel suédois'
+            },
+            "Grh": {
+                'link': u'{{Institution:Gripsholm Castle}}',
+                'cat': u'Art in Gripsholms slott'
+            },
+            "Drh": {
+                'link': u'[[Drottningholms slott]]',
+                'cat': u'Paintings_at_Royal_Domain_of_Drottningholm'
+            },
+        }
+        for k, v in mappings.iteritems():
+            if self.image.startswith(k):
+                return v
 
 if __name__ == "__main__":
     # run as
