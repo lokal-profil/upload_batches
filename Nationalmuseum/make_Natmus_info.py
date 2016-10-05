@@ -3,13 +3,11 @@
 """
 Artwork template production
 
-@todo: Comment on idiocyncrasies of the input json and theneed to look things
+@todo: Comment on idiocyncrasies of the input json and the need to look things
 up on wikidata.
 """
 import batchupload.helpers as helpers
 import batchupload.common as common  # temp before this is merged with helper
-import batchupload.listscraper as listscraper
-import batchupload.csv_methods as csv_methods
 from batchupload.make_info import MakeBaseInfo
 import os
 import pywikibot
@@ -21,25 +19,36 @@ BATCH_DATE = u'2016-10'
 BASE_NAME = u'artwork'
 COLLECTION = u'Nationalmuseum'
 LANGUAGE_PRIORITY = ('_', 'en', 'sv')
+ANON_Q = 'Q4233718'
 
 
 class NatmusInfo(MakeBaseInfo):
     """Construct file descriptions and filenames for Natmus batch upload."""
 
-    def __init__(self):
+    def __init__(self, **options):
         """
         Initialise a make_info object.
 
         @param batch_cat: base_name for maintanance categories
         @param batch_label: label for this particular batch
         """
-        # load wikidata info
+        # load wikidata and static mappings
+        self.skip_non_wikidata = options['skip_non_wikidata']
         self.wd_paintings = NatmusInfo.load_painting_items()
+        self.wd_creators = NatmusInfo.load_creator_items()
+        self.place_mappings = NatmusInfo.load_place_mappings()
+        self.qualifier_mappings = NatmusInfo.load_qualifier_mappings()
+        self.type_mappings = {  # per Template:I18n/objects
+            'Q132137': 'icon',
+            'Q3305213': 'painting'
+        }
 
-        # handle nsid connections
+        # store various ids for potential later use
         self.nsid = {}
         self.uri_ids = {}
-        self.load_place_mappings()
+        self.anon_nsid = set()  #@todo output # nsid entries found to be associated with anons
+        self.non_wd_nsid = {}  #@todo output # non-anon nsid entries not in wikidata key is nsid, value is a set of potential matches
+        #@todo something too keep track of which of the above were not mapped
 
         # black-listed values
         self.bad_namn = tuple()  # Artist names which actually mean unknown
@@ -54,12 +63,7 @@ class NatmusInfo(MakeBaseInfo):
     def test():
         #@todo: kill
         data = NatmusInfo.load_painting_items()
-        i=0
-        for k, v in data.iteritems():
-            if i > 10:
-                break
-            i += 1
-            print k, v
+        print data.get('16071')
 
     def log(self, text):
         """
@@ -69,9 +73,10 @@ class NatmusInfo(MakeBaseInfo):
         """
         self.logger.append(text)
 
-    def load_place_mappings(self):
-        """Store hard coded list of place to wikidata mappings."""
-        self.place_mappings = {
+    @staticmethod
+    def load_place_mappings():
+        """Mappings between known placees and wikidata."""
+        return {
             u'Moskva': 'Q649',
             u'Kina': 'Q29520',
             u'Leiden': 'Q43631',
@@ -90,6 +95,37 @@ class NatmusInfo(MakeBaseInfo):
             u'Nederländerna': 'Q55',
             u'Rom': 'Q220',
             u'Antwerpen': 'Q12892',
+        }
+
+    @staticmethod
+    def load_qualifier_mappings():
+        """
+        Mappings between wikidata qualifier and Commons constructs.
+
+        'param' is the parameter added to the creator template
+        'template' is the stand alone template for plain names
+        """
+        return {
+            'P1773': {
+                'param': u'attributed to',
+                'template': u'{{Attributed to|%s}}'
+            },
+            'P1774': {
+                'param': u'workshop of',
+                'template': u'{{Name|workshop of|%s}}'
+            },
+            'P1780': {
+                'param': u'school of',
+                'template': u'{{Name|school of|%s}}'
+            },
+            'P1777': {
+                'param': u'manner of',
+                'template': u'{{Manner of|%s}}'
+            },
+            'P1877': {
+                'param': u'after',
+                'template': u'{{After|%s}}'
+            },
         }
 
     @staticmethod
@@ -116,7 +152,7 @@ class NatmusInfo(MakeBaseInfo):
                 value = value.split('|')
                 for i, v in enumerate(value):
                     value[i] = v.replace(entity_url, '')
-                new_data[k][kk] = value
+                new_data[k][kk] = common.trim_list(value)
         return new_data
 
     @staticmethod
@@ -143,7 +179,32 @@ group by ?item ?obj_id
 '''
         s = sparql.SparqlQuery()
         data = s.select(query)
+        pywikibot.output("Loaded %d paintings from wikidata" % len(data))
         return NatmusInfo.clean_sparql_output(data, 'obj_id')
+
+    @staticmethod
+    def load_creator_items():
+        """Store all nsid people in Wikidata."""
+        query = u'''\
+# Nationalmuseum import
+SELECT ?item ?itemLabel ?nsid (group_concat(distinct ?creator_template;separator="|") as ?creator_templates) (group_concat(distinct ?commons_cat;separator="|") as ?commons_cats)
+WHERE
+{
+  ?item wdt:P2538 ?nsid .
+  OPTIONAL {
+    ?item wdt:P1472 ?creator_template .
+  }
+  OPTIONAL {
+    ?item wdt:P373 ?commons_cat .
+  }
+  SERVICE wikibase:label { bd:serviceParam wikibase:language "sv" }
+}
+group by ?item ?itemLabel ?nsid
+'''
+        s = sparql.SparqlQuery()
+        data = s.select(query)
+        pywikibot.output("Loaded %d artists from wikidata" % len(data))
+        return NatmusInfo.clean_sparql_output(data, 'nsid')
 
     def load_data(self, in_file):
         """
@@ -170,6 +231,7 @@ group by ?item ?obj_id
         """
         # should this actually carry code
         # improve docstring
+        #@todo is this needed? could wikidata etc. bit be moved from inti to here?
         pass
 
     def process_data(self, raw_data):
@@ -201,21 +263,16 @@ group by ?item ?obj_id
                     d[key] = NatmusItem.make_item_from_raw(
                         value, matches.pop(), self)
                 except common.MyError as e:
-                    self.log(e)
+                    self.log(str(e))
 
         pywikibot.output(
-            "Identified %d valid paintings of %d records" %
-            (len(d), len(lido_data)))
+            "Identified %d valid paintings out of %d records and %d files" %
+            (len(d), len(lido_data), len(image_files)))
         self.data = d
 
     @staticmethod
     def get_institution(item):
-        """
-        Identify institution and subcollection based on filename.
-
-        @param item: the metadata for the media file in question
-        @return: str
-        """
+        """Identify institution and subcollection based on filename."""
         institution = u'{{Institution:Nationalmuseum Stockholm}}'
         sub_collection = item.get_subcollection()
         if sub_collection:
@@ -223,12 +280,7 @@ group by ?item ?obj_id
         return institution
 
     def get_creation_place(self, item):
-        """
-        Return a formatted list of creation places.
-
-        @param item: the metadata for the media file in question
-        @return: str
-        """
+        """Return a formatted list of creation places."""
         places = item.get_creation_place()
         if not places:
             return ''
@@ -244,12 +296,7 @@ group by ?item ?obj_id
         return ', '.join(city_links)
 
     def get_depicted(self, item):
-        """
-        Return a formatted list of linked depicted people.
-
-        @param item: the metadata for the media file in question
-        @return: str
-        """
+        """Return a formatted list of linked depicted people."""
         depicted = item.get_depicted()
 
         if not depicted:
@@ -264,25 +311,16 @@ group by ?item ?obj_id
 
     @staticmethod
     def get_original_description(item):
-        """
-        Return the description wrapped in an original descriiption template.
-
-        @param item: the metadata for the media file in question
-        @return: str
-        """
+        """Return the description wrapped in an original descriiption template."""
         descr = item.get_description()
         if descr:
             return u'{{Information field' \
                    u'|name={{original caption/i18n|header}}' \
                    u'|value=%s}}' % descr
+        return ''
 
     def get_qid(self, item):
-        """
-        Get the wikidata id for an item.
-
-        @param item: the metadata for the media file in question
-        @return: str
-        """
+        """Get the wikidata id for an item."""
         qid = ''
         wd_data = self.wd_paintings.get(item.get_obj_id())
         if wd_data:
@@ -290,24 +328,15 @@ group by ?item ?obj_id
         return qid
 
     def get_type(self, item):
-        """
-        Get the object type of an item.
-
-        @param item: the metadata for the media file in question
-        @return: str
-        """
+        """Get the object type of an item."""
         typ = ''
-        mappings = {  # per Template:I18n/objects
-            'Q132137': 'icon',
-            'Q3305213': 'painting'
-        }
 
         # get previous wikidata info
         wd_data = self.wd_paintings.get(item.get_obj_id())
         if wd_data:
             types = []
             for t in wd_data.get('types'):
-                types.append(mappings.get(t))
+                types.append(self.type_mappings.get(t))
             types = common.trim_list(types)
             if len(types) == 1:
                 typ = types[0]
@@ -317,23 +346,142 @@ group by ?item ?obj_id
                     (len(types), item.get_obj_id()))
         return typ
 
-    def make_info_template(self, item):
-        """
-        Make a filled in Artwork template for a single file.
+    def get_wd_painting_artists(self, item):
+        """Get any non-anon artists in a wd_painting object for an item."""
+        wd_painting = self.wd_paintings.get(item.get_obj_id)
+        if wd_painting and wd_painting.get('creators'):
+            creators = set(wd_painting.get('creators')) - set(ANON_Q)
+            if creators:
+                return list(creators)
+        return []
 
-        @param item: the metadata for the media file in question
-        @return: str
+    def get_single_artist(self, nsid, artist, artist_count, wd_painting_artists):
         """
+        Return formating data for a single artist.
+
+        @param nsid: nsid of artist
+        @param artist: artist info from lido data
+        @param artist_count: number of artists in lido data
+        @param wd_painting_artists: list of artist from wikidata painitng item
+        """
+        # handle qualifier
+        qualifier = None
+        if artist.get('qualifier'):
+            qualifier = self.qualifier_mappings.get(artist.get('qualifier'))
+
+        name = artist['name']
+        wd_artist = self.wd_creators.get(nsid)
+        if not name:  # no name means unknown
+            # handle anons
+            self.anon_nsid.add(nsid)
+            return None
+        elif wd_artist and wd_artist.get('item') != ANON_Q:
+            # use wikidata artist info if exists
+            creator_templates = wd_artist.get('creator_templates')
+            if creator_templates and len(creator_templates) == 1:
+                return {
+                    'template': creator_templates[0],
+                    'qualifier': qualifier
+                    }
+            else:
+                name = artist['name'] or wd_artist.get('itemLabel')
+                if not name:
+                    pywikibot.error(
+                        "Failed to get a name for artist: %s" %
+                        wd_artist.get('item'))
+                return {
+                    'link': wd_artist.get('item'),
+                    'name': artist['name'],
+                    'qualifier': qualifier
+                    }
+        else:
+            # log as missing in wikidata
+            if nsid not in self.non_wd_nsid.keys():
+                self.non_wd_nsid[nsid] = set()
+
+            # try to use info in wikidata painting object but only in
+            # cases where wrong guesses are unlikely
+            if len(wd_painting_artists) == 1 and artist_count < 2:
+                self.non_wd_nsid[nsid].add(wd_painting_artists[0])
+
+                # @todo should look up potential creator template
+                return {
+                    'link': wd_painting_artists[0],
+                    'name': artist['name'],
+                    'qualifier': qualifier
+                    }
+            else:
+                # no clever links found
+                return {
+                    'name': artist['name'],
+                    'qualifier': qualifier
+                    }
+
+    @staticmethod
+    def format_artist_name(artist_data):
+        """Given aritst_data return formatted output."""
+        if not artist_data:  # i.e. None
+            return '{{unknown|author}}'
+            
+        qualifier = artist_data.get('qualifier')
+        if artist_data.get('template'):
+            if qualifier:
+                return u'{{Creator:%s|%s}}' % (
+                    artist_data.get('template'), qualifier['param'])
+            return u'{{Creator:%s}}' % artist_data.get('template')
+        elif artist_data.get('link'):
+            linked_string = u'[[:d:%s|%s]]' % (
+                artist_data.get('item'), artist_data.get('name'))
+            if qualifier:
+                return qualifier['template'] % linked_string
+            return linked_string
+        else:
+            if qualifier:
+                return qualifier['template'] % artist_data.get('name')
+            return artist_data.get('name')
+
+    def get_artist(self, item):
+        """Get formated artist info based on item and wikidata."""
+        # formated string for unknown or anonymous
+        artists = []
+
+        wd_painting_artists = self.get_wd_painting_artists(item)
+        lido_artists = item.get_artists()
+        for nsid, artist_data in lido_artists.iteritems():
+            artists.append(
+                self.get_single_artist(
+                    nsid, artist_data, len(lido_artists), wd_painting_artists))
+
+        if len(artists) == 0:
+            return ''
+        elif len(artists) == 1:
+            return NatmusInfo.format_artist_name(artists[0])
+        else:
+            non_anons = common.trim_list(artists)
+            if not non_anons:
+                # multiple anons, simply output one
+                return NatmusInfo.format_artist_name(artists[0])
+            elif len(non_anons) == 1 and non_anons[0].get('qualifier'):
+                # anons + one named artist with qualifier
+                return NatmusInfo.format_artist_name(artists[0])
+            else:
+                # multiple named artists, just ignore any anons
+                formatted_artists = \
+                    [NatmusInfo.format_artist_name(artist) for artist in non_anons]
+                return '\n '.join(formatted_artists)
+
+    def make_info_template(self, item):
+        """Make a filled in Artwork template for a single file."""
         data = {
             'depicted': self.get_depicted(item),
-            'artist': None,  #@todo
+            'artist': self.get_artist(item),
             'title': item.get_title(),
             'wikidata': self.get_qid(item),
             'type': self.get_type(item),
             'description': item.get_description(),
             'original_description': NatmusInfo.get_original_description(item),
             'date': None,  #@todo
-            'medium': None,  #@todo
+            'medium': item.get_technique(),  #@todo could do better
             'dimension': item.get_dimensions(),
             'institution': NatmusInfo.get_institution(item),
             'inscriptions': item.get_inscription(),
@@ -405,16 +553,13 @@ group by ?item ?obj_id
             cats.append(sub_collection['cat'])
 
         #@todo
-        #something if depicted should be mapped
+        # cat for depicted people
+        # cat for artist
+
         pass
 
     def get_original_filename(self, item):
-        """
-        Return the original filename of a media file without file extension.
-
-        @param item: the metadata for the media file in question
-        @return: str
-        """
+        """Return the original image filename without file extension."""
         return os.path.splitext(item.image)[0]
 
     def run(self, in_file, base_name=None):
@@ -440,6 +585,7 @@ group by ?item ?obj_id
         options = {
             'in_file': None,
             'base_name': None,
+            'skip_non_wikidata': False
         }
         natmus_options = {
             'lido_file': None,
@@ -454,6 +600,8 @@ group by ?item ?obj_id
             elif option == '-image_files':
                 natmus_options['image_files'] = \
                     helpers.convertFromCommandline(value)
+            elif option == '-skip_non_wikidata':
+                options['skip_non_wikidata'] = True
 
         if natmus_options['lido_file'] and natmus_options['image_files']:
             options['in_file'] = \
@@ -472,6 +620,7 @@ group by ?item ?obj_id
             u'\tpython Batches/Nationalmuseum/make_Natmus_info.py -lido_file:PATH -image_files:PATH -dir:PATH\n' \
             u'\t-lido_file:PATH path to lido metadata file\n' \
             u'\t-image_files:PATH path to image filenames file\n' \
+            u'\t-skip_non_wikidata to skip images without a wikidata entry\n' \
             u'\t-dir:PATH specifies the path to the directory containing a ' \
             u'user_config.py file (optional)\n' \
             u'\tExample:\n' \
@@ -502,7 +651,8 @@ class NatmusItem(object):
         """
         d = entry.copy()
         # skip paintings not in wikidata
-        if d['obj_id'] not in natmus_info.wd_paintings.keys():
+        if d['obj_id'] not in natmus_info.wd_paintings.keys() and \
+                natmus_info.skip_non_wikidata:
             raise common.MyError(
                 u"skip_4: "
                 u"%s did not have any associated wikidata entry" % d['obj_id'])
@@ -548,7 +698,6 @@ class NatmusItem(object):
         A named creator is:
         * Named
         * Not qualified or qualified with P1773
-        @todo: Filter out anonymous but unidentified using an enriched anons
         """
         named_creators = []
         for k, v in self.creator.iteritems():
@@ -586,6 +735,9 @@ class NatmusItem(object):
         """Return the obj_id."""
         return self.obj_id
 
+    def get_artists(self):
+        return self.creator
+
     def get_title(self):
         """Return language wrapped titles."""
         return NatmusItem.language_wrapped_list(self.title)
@@ -597,6 +749,9 @@ class NatmusItem(object):
     def get_inscription(self):
         """Return language wrapped inscriptions."""
         return NatmusItem.language_wrapped_list(self.inscriptions)
+
+    def get_technique(self):
+        return NatmusItem.language_wrapped_list(self.techniques)
 
     def get_depicted(self):
         """Return list of subjects on the image."""
@@ -647,7 +802,7 @@ class NatmusItem(object):
 
     def get_id_link(self):
         """Format an accession number link."""
-        return u'{{Nationalmuseum Stockholm link |1=%s |2=%s }}' % \
+        return u'{{Nationalmuseum Stockholm link|%s|%s}}' % \
             (self.obj_id, self.inv_nr)
 
     def get_subcollection(self):
