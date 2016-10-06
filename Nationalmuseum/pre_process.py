@@ -127,9 +127,7 @@ def handle_actor(actor):
     if actor[u'lido:actorID'][u'@lido:type'] == u'Nationalmuseum Sweden artist ID; NSID':
         result['nsid'] = actor[u'lido:actorID'][u'#text']
     else:
-        result['other_id'] = u'%s: %s' % (
-            actor[u'lido:actorID'][u'@lido:type'],
-            actor[u'lido:actorID'][u'#text'])
+        result['other_id'] = actor[u'lido:actorID'][u'#text']
     name = actor[u'lido:nameActorSet'][u'lido:appellationValue']
     if name in unknowns:
         name = None

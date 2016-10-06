@@ -337,7 +337,7 @@ group by ?item ?itemLabel ?nsid
         if depicted.get('nsid'):
             nsid.add(depicted.get('nsid'))
         if other_id:
-            nsid.add(other_id.replace('URI: ', ''))
+            nsid.add(other_id)
         if len(nsid) == 1:
             nsid = nsid.pop()
         else:
