@@ -239,9 +239,7 @@ group by ?item ?itemLabel ?nsid
         """
         Load the mapping files and package them appropriately.
 
-        The loaded mappings are stored as self.mappings
-
-        @param update: whether to first download the latest mappings
+        @param update: ignored
         """
         self.place_mappings = NatmusInfo.load_place_mappings()
         self.qualifier_mappings = NatmusInfo.load_qualifier_mappings()
@@ -250,12 +248,11 @@ group by ?item ?itemLabel ?nsid
             'Q3305213': 'painting'
         }
 
-        self.nsid_wd_mapping = common.open_and_read_file(
+        # load mapping and store in uri_ids
+        local_nsid_mapping = common.open_and_read_file(
             self.local_nsid_mappings, as_json=True)
-        # should this actually carry code
-        # improve docstring
-        #@todo is this needed? could wikidata etc. bit be moved from inti to here?
-        pass
+        for k, v in local_nsid_mapping.iteritems():
+            self.uri_ids[k]['mapped'] = v
 
     def process_data(self, raw_data):
         """
@@ -373,6 +370,13 @@ group by ?item ?itemLabel ?nsid
                         wd_painting.get('depicted_cats'))
                 return {
                     'link': wd_painting_depicted[0],
+                    'name': name
+                    }
+            elif self.uri_ids[nsid].get('mapped'):
+                # locally mapped to a wikidata entry
+                item.add_to_tracker('issues', 'needs depicted cat')
+                return {
+                    'link': self.uri_ids[nsid].get('mapped'),
                     'name': name
                     }
             else:
@@ -806,6 +810,7 @@ group by ?item ?itemLabel ?nsid
             'no date format': u'fix date format',
             'unlinked depicted': u'unlinked depicted',
             'unlinked artist': u'unlinked artist',
+            'needs depicted cat': u'add depicted cat via wikidata and depicted to wikidata',
         }
 
         cats = []
@@ -838,9 +843,11 @@ group by ?item ?itemLabel ?nsid
         for k, v in self.nsid.iteritems():
             if v.get('wd'):
                 self.log(u'%s: %s' % (k, v))
-        self.log(u'--------------------------------------------------uri_ids---')
+        self.log(u'------------------------------------------------uri_ids---')
         for k, v in self.uri_ids.iteritems():
-            if v.get('wd'):
+            if v.get('wd') and not v.get('mapped'):
+                self.log(u'%s: %s' % (k, v))
+            elif not v.get('wd') and not v.get('mapped') and v.get('freq') > 5:
                 self.log(u'%s: %s' % (k, v))
 
         if base_name:
