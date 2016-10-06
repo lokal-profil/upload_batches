@@ -744,7 +744,7 @@ group by ?item ?itemLabel ?nsid
             'permission': self.get_permission(item),
         }
         return u'''\
-{{Artwork
+{{{{Artwork
  |other_fields_1       = {depicted}
  |artist               = {artist}
  |title                = {title}
@@ -762,7 +762,7 @@ group by ?item ?itemLabel ?nsid
  |source               = {source}
  |permission           = {permission}
  |other_versions       =
-}}'''.format(**data)
+}}}}'''.format(**data)
 
     def generate_filename(self, item):
         """
@@ -1128,7 +1128,7 @@ class NatmusItem(object):
             }
             measure = ''
             if k != '_':
-                measure = u'{{en|%s}}: ' % k
+                measure = u"''%s'': " % k
             measure += u'{{Size|' + \
                 u'unit={unit}|width={width}|height={height}|depth={depth}'.format(**data) + \
                 u'}}'
