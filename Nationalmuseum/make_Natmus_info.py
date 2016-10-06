@@ -785,10 +785,6 @@ group by ?item ?itemLabel ?nsid
         @return: list of categories (without "Category:" prefix)
         """
         cats = []
-        # sub-collection cat
-        sub_collection = item.get_subcollection()
-        if sub_collection:
-            cats.append(sub_collection['cat'])
 
         wd_painting = self.wd_paintings.get(item.get_obj_id())
         if wd_painting and wd_painting.get('commons_cats'):
@@ -826,6 +822,11 @@ group by ?item ?itemLabel ?nsid
         # base cats
         cats.append(u'Paintings in the Nationalmuseum Stockholm')
         cats.append(self.batch_cat)
+
+        # sub-collection cat
+        sub_collection = item.get_subcollection()
+        if sub_collection:
+            cats.append(sub_collection['cat'])
 
         if not content_cats:
             cats.append(self.make_maintanance_cat(u'improve categories'))
