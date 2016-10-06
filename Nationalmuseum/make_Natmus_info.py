@@ -167,9 +167,11 @@ SELECT ?item ?obj_id
   (group_concat(distinct ?type;separator="|") as ?types)
   (group_concat(distinct ?creator;separator="|") as ?creators)
   (group_concat(distinct ?creator_template;separator="|") as ?creator_templates)
+  (group_concat(distinct ?creator_cat;separator="|") as ?creator_cats)
   (group_concat(distinct ?death_date;separator="|") as ?death_dates)
   (group_concat(distinct ?commons_cat;separator="|") as ?commons_cats)
   (group_concat(distinct ?depicted_person;separator="|") as ?depicted_persons)
+  (group_concat(distinct ?depicted_cat;separator="|") as ?depicted_cats)
 WHERE
 {
   ?item wdt:P2539 ?obj_id .
@@ -184,6 +186,9 @@ WHERE
     OPTIONAL {
       ?creator wdt:P1472 ?creator_template .
     }
+    OPTIONAL {
+      ?creator wdt:P373 ?creator_cat .
+    }
   }
   OPTIONAL {
     ?item wdt:P373 ?commons_cat .
@@ -191,6 +196,9 @@ WHERE
   OPTIONAL {
     ?item wdt:P180 ?depicted_person .
     ?depicted_person wdt:P31 wd:Q5 .
+    OPTIONAL {
+      ?depicted_person wdt:P373 ?depicted_cat .
+    }
   }
 }
 group by ?item ?obj_id
@@ -319,7 +327,8 @@ group by ?item ?itemLabel ?nsid
 
         return ', '.join(city_links)
 
-    def get_single_depicted(self, depicted, depicted_count, wd_painting_depicted):
+    def get_single_depicted(self, depicted, depicted_count,
+                            wd_painting_depicted, item):
         """
         Return formating data for a single depicted person.
 
@@ -327,6 +336,7 @@ group by ?item ?itemLabel ?nsid
         @param depicted: depicted info from lido data
         @param depicted_count: number of depicted in lido data
         @param wd_painting_depicted: list of artist from depicted painting item
+        @param item: the item in question
         """
         other_id = depicted.get('other_id')
         name = depicted['name']
@@ -349,6 +359,8 @@ group by ?item ?itemLabel ?nsid
         wd_artist = self.wd_creators.get(nsid)
 
         if wd_artist and wd_artist.get('item') != ANON_Q:
+            if wd_artist.get('commons_cat'):
+                item.add_to_tracker('depicted', wd_artist.get('commons_cat'))
             return {
                 'link': wd_artist.get('item'),
                 'name': name
@@ -363,6 +375,11 @@ group by ?item ?itemLabel ?nsid
             if len(wd_painting_depicted) == 1 and depicted_count == 1:
                 self.uri_ids[other_id]['wd'].add(wd_painting_depicted[0])
 
+                wd_painting = self.wd_paintings.get(item.get_obj_id())
+                if wd_painting.get('depicted_cats'):
+                    item.add_to_tracker(
+                        'depicted',
+                        wd_painting.get('depicted_cats'))
                 return {
                     'link': wd_painting_depicted[0],
                     'name': name
@@ -376,6 +393,7 @@ group by ?item ?itemLabel ?nsid
                         u"%s: wd: %s" %
                         (nsid, ', '.join(wd_painting_depicted)))
                 # no clever links found
+                item.add_to_tracker('issues', 'unlinked depicted')
                 return {
                     'name': name
                     }
@@ -392,7 +410,7 @@ group by ?item ?itemLabel ?nsid
 
     def get_wd_painting_depicted(self, item):
         """Get any non-anon depicted in a wd_painting object for an item."""
-        wd_painting = self.wd_paintings.get(item.get_obj_id)
+        wd_painting = self.wd_paintings.get(item.get_obj_id())
         if wd_painting and wd_painting.get('depicted_persons'):
             depicted = set(wd_painting.get('depicted_persons')) - set(ANON_Q)
             if depicted:
@@ -420,7 +438,7 @@ group by ?item ?itemLabel ?nsid
                 NatmusInfo.format_depicted_name(
                     self.get_single_depicted(
                         depicted_data, len(lido_depicted),
-                        wd_painting_depicted)))
+                        wd_painting_depicted, item)))
 
         return u'{{depicted person|%s|style=information field}} ' % \
             '|'.join(formatted_depicted)
@@ -442,7 +460,7 @@ group by ?item ?itemLabel ?nsid
         if wd_data:
             qid = wd_data.get('item')[0]
         else:
-            item.issues.add('no painting wd')
+            item.add_to_tracker('issues', 'no painting wd')
         return qid
 
     def get_deathyear(self, item):
@@ -451,11 +469,12 @@ group by ?item ?itemLabel ?nsid
 
         @return: int or None
         """
-        unknown = (u't329875228', u't318787658')  # internal markup for unknown
+        # internal markup for unknown or something weird
+        unknown = (u't329875228', u't318787658', u't329488873', u't318035461')
         deathyears = []
 
         # via wikidata for item
-        wd_painting = self.wd_paintings.get(item.get_obj_id)
+        wd_painting = self.wd_paintings.get(item.get_obj_id())
         if wd_painting and wd_painting.get('death_dates'):
             deathyears += wd_painting.get('death_dates')
 
@@ -526,14 +545,15 @@ group by ?item ?itemLabel ?nsid
 
     def get_wd_painting_artists(self, item):
         """Get any non-anon artists in a wd_painting object for an item."""
-        wd_painting = self.wd_paintings.get(item.get_obj_id)
+        wd_painting = self.wd_paintings.get(item.get_obj_id())
         if wd_painting and wd_painting.get('creators'):
             creators = set(wd_painting.get('creators')) - set(ANON_Q)
             if creators:
                 return list(creators)
         return []
 
-    def get_single_artist(self, nsid, artist, artist_count, wd_painting_artists):
+    def get_single_artist(self, nsid, artist, artist_count,
+                          wd_painting_artists, item):
         """
         Return formating data for a single artist.
 
@@ -541,6 +561,7 @@ group by ?item ?itemLabel ?nsid
         @param artist: artist info from lido data
         @param artist_count: number of artists in lido data
         @param wd_painting_artists: list of artist from wikidata painting item
+        @param item: the item in question
         """
         # handle qualifier
         qualifier = None
@@ -555,6 +576,9 @@ group by ?item ?itemLabel ?nsid
             return None
         elif wd_artist and wd_artist.get('item') != ANON_Q:
             # use wikidata artist info if exists
+            if wd_artist.get('commons_cats'):
+                item.add_to_tracker('artist', wd_artist.get('commons_cats'))
+
             creator_templates = wd_artist.get('creator_templates')
             if creator_templates and len(creator_templates) == 1:
                 return {
@@ -582,13 +606,27 @@ group by ?item ?itemLabel ?nsid
             # cases where wrong guesses are unlikely
             if len(wd_painting_artists) == 1 and artist_count < 2:
                 self.non_wd_nsid[nsid].add(wd_painting_artists[0])
+                wd_painting = self.wd_paintings.get(item.get_obj_id())
+                creator_cats = wd_painting.get('creator_cats')
+                creator_templates = wd_painting.get('creator_templates')
 
-                # @todo should look up potential creator template
-                return {
-                    'link': wd_painting_artists[0],
-                    'name': name,
-                    'qualifier': qualifier
-                    }
+                # add creator cats
+                if creator_cats:
+                    item.add_to_tracker('artist', creator_cats)
+
+                # try to use creator template and fall back on link
+                if creator_templates and len(creator_templates) == 1:
+                    return {
+                        'template': creator_templates[0],
+                        'link': wd_painting_artists[0],
+                        'qualifier': qualifier
+                        }
+                else:
+                    return {
+                        'link': wd_painting_artists[0],
+                        'name': name,
+                        'qualifier': qualifier
+                        }
             else:
                 if len(wd_painting_artists) >= 1:
                     # log cases where we are potentially not using data
@@ -598,6 +636,7 @@ group by ?item ?itemLabel ?nsid
                         u"%s: wd: %s" %
                         (nsid, ', '.join(wd_painting_artists)))
                 # no clever links found
+                item.add_to_tracker('issues', 'unlinked artist')
                 return {
                     'name': name,
                     'qualifier': qualifier
@@ -636,7 +675,8 @@ group by ?item ?itemLabel ?nsid
         for nsid, artist_data in lido_artists.iteritems():
             artists.append(
                 self.get_single_artist(
-                    nsid, artist_data, len(lido_artists), wd_painting_artists))
+                    nsid, artist_data, len(lido_artists),
+                    wd_painting_artists, item))
 
         if len(artists) == 0:
             return ''
@@ -744,9 +784,17 @@ group by ?item ?itemLabel ?nsid
         if sub_collection:
             cats.append(sub_collection['cat'])
 
-        #@todo
-        # cat for depicted people
-        # cat for artist
+        wd_painting = self.wd_paintings.get(item.get_obj_id())
+        if wd_painting and wd_painting.get('commons_cats'):
+            # if commonscat(s) for the image then add no other content cats
+            cats += common.trim_list(wd_painting.get('commons_cats'))
+        else:
+            for tracker in ('depicted', 'artist'):
+                while True:
+                    entry = item.get_from_tracker(tracker)
+                    if not entry:
+                        break
+                    cats.append(entry)
 
         cats = list(set(cats))  # remove any duplicates
         return cats
@@ -759,6 +807,13 @@ group by ?item ?itemLabel ?nsid
         @param content_cats: any content categories for the file
         @return: list of categories (without "Category:" prefix)
         """
+        issue_mapping = {
+            'no painting wd': u'connect to wikidata item',
+            'no date format': u'fix date format',
+            'unlinked depicted': u'unlinked depicted',
+            'unlinked artist': u'unlinked artist',
+        }
+
         cats = []
         # base cats
         cats.append(u'Paintings in the Nationalmuseum Stockholm')
@@ -767,10 +822,11 @@ group by ?item ?itemLabel ?nsid
         if not content_cats:
             cats.append(self.make_maintanance_cat(u'improve categories'))
 
-        #@todo
-        # cat for depicted people no wd
-        # cat for artist no wd
-        # cat for no wd
+        while True:
+            issue = item.get_from_tracker('issues')
+            if not issue:
+                break
+            cats.append(self.make_maintanance_cat(issue_mapping[issue]))
 
         cats = list(set(cats))  # remove any duplicates
         return cats
@@ -857,8 +913,15 @@ class NatmusItem(object):
         for key, value in initial_data.iteritems():
             setattr(self, key, value)
 
-        # a tracker of anything needed for meta_cats
+        # a tracker of anything needed for categorization
         self.issues = set()
+        self.depicted_cats = set()
+        self.artist_cats = set()
+        self.known_trackers = {
+            'issues': self.issues,
+            'depicted': self.depicted_cats,
+            'artist': self.artist_cats,
+        }
 
     @staticmethod
     def make_item_from_raw(entry, image_file, natmus_info):
@@ -913,6 +976,44 @@ class NatmusItem(object):
                     value = u'{{%s|%s}}' % (lang, value)
                 values.append(value)
         return u' '.join(values)
+
+    def add_to_tracker(self, tracker, entry):
+        """
+        Add an entry to the local tracker.
+
+        If a list is provided each entry is added separately.
+
+        @param tracker: the tracker look-up name in known_trackers
+        @param entry: the data to add to the tracker
+        """
+        if tracker not in self.known_trackers:
+            pywikibot.error(
+                "You referred to a non-existant tracker in NatmusItem: %s" %
+                tracker)
+        tracker = self.known_trackers[tracker]
+        if isinstance(entry, (list, tuple)):
+            for e in entry:
+                tracker.add(e)
+        else:
+            tracker.add(entry)
+
+    def get_from_tracker(self, tracker):
+        """
+        Pop an entry from a tracker.
+
+        If the tracker is empty None is returned.
+
+        @param tracker: the tracker look-up name in known_trackers
+        """
+        if tracker not in self.known_trackers:
+            pywikibot.error(
+                "You referred to a non-existant tracker in NatmusItem: %s" %
+                tracker)
+        tracker = self.known_trackers[tracker]
+        if len(tracker) == 0:
+            return None
+        else:
+            return tracker.pop()
 
     def get_named_creator(self):
         """
@@ -1049,10 +1150,10 @@ class NatmusItem(object):
             if std_date:
                 return std_date
             else:
-                self.issues.add('no date format')
+                self.add_to_tracker('issues', 'no date format')
                 return ('sv', sv_date.strip())
 
-        self.issues.add('no date format')
+        self.add_to_tracker('issues', 'no date format')
         # just output the first available string
         for lang in LANGUAGE_PRIORITY:
             lang_date = date_info.get('text').get(lang)
