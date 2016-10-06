@@ -345,11 +345,11 @@ group by ?item ?itemLabel ?nsid
 
         wd_artist = self.wd_creators.get(nsid)
 
-        if wd_artist and wd_artist.get('item') != ANON_Q:
+        if wd_artist and wd_artist.get('item') != [ANON_Q]:
             if wd_artist.get('commons_cat'):
                 item.add_to_tracker('depicted', wd_artist.get('commons_cat'))
             return {
-                'link': wd_artist.get('item'),
+                'link': wd_artist.get('item')[0],
                 'name': name
                 }
         else:
@@ -578,26 +578,26 @@ group by ?item ?itemLabel ?nsid
         if not name:  # no name means unknown
             # handle anons
             return None
-        elif wd_artist and wd_artist.get('item') != ANON_Q:
+        elif wd_artist and wd_artist.get('item') != [ANON_Q]:
             # use wikidata artist info if exists
             if wd_artist.get('commons_cats'):
                 item.add_to_tracker('artist', wd_artist.get('commons_cats'))
 
             creator_templates = wd_artist.get('creator_templates')
+            qid = wd_artist.get('item')[0]
             if creator_templates and len(creator_templates) == 1:
                 return {
                     'template': creator_templates[0],
-                    'link': wd_artist.get('item'),
+                    'link': qid,
                     'qualifier': qualifier
                     }
             else:
                 #name = wd_artist.get('itemLabel') or artist['name']
                 if not name:
                     pywikibot.error(
-                        "Failed to get a name for artist: %s" %
-                        wd_artist.get('item'))
+                        "Failed to get a name for artist: %s" % qid)
                 return {
-                    'link': wd_artist.get('item'),
+                    'link': qid,
                     'name': name,
                     'qualifier': qualifier
                     }
