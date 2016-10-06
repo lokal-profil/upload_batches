@@ -33,40 +33,22 @@ class NatmusInfo(MakeBaseInfo):
         @param batch_cat: base_name for maintanance categories
         @param batch_label: label for this particular batch
         """
+        self.skip_non_wikidata = options['skip_non_wikidata']
+        self.local_nsid_mappings = options['nsid_file']
+
         # load wikidata and static mappings
         #@todo: load list of manual nsid/wikidata mappings (from logs etc)
-        self.skip_non_wikidata = options['skip_non_wikidata']
         self.wd_paintings = NatmusInfo.load_painting_items()
         self.wd_creators = NatmusInfo.load_creator_items()
-        self.place_mappings = NatmusInfo.load_place_mappings()
-        self.qualifier_mappings = NatmusInfo.load_qualifier_mappings()
-        self.type_mappings = {  # per Template:I18n/objects
-            'Q132137': 'icon',
-            'Q3305213': 'painting'
-        }
 
         # store various ids for potential later use
-        self.nsid = {}  # is this used?
+        self.nsid = {}  # stores any nsid ids, their frequency and potential wikidata matches
         self.uri_ids = {}  # stores any uri ids, their frequency and potential wikidata matches
-        self.anon_nsid = set()  #@todo output # nsid entries found to be associated with anons
-        self.non_wd_nsid = {}  #@todo output # non-anon nsid entries not in wikidata key is nsid, value is a set of potential matches
-        #@todo something too keep track of which of the above were not mapped
-
-        # black-listed values
-        self.bad_namn = tuple()  # Artist names which actually mean unknown
-        self.bad_date = tuple()  # Date strings which actually mean unknown
 
         # log file to handle skipped files
         self.logger = []
 
         super(NatmusInfo, self).__init__(BATCH_CAT, BATCH_DATE)
-
-    @staticmethod
-    def test():
-        #@todo: kill
-        data = NatmusInfo.load_painting_items()
-        for k in data.keys()[:10]:
-            print data[k]
 
     def log(self, text):
         """
@@ -261,6 +243,15 @@ group by ?item ?itemLabel ?nsid
 
         @param update: whether to first download the latest mappings
         """
+        self.place_mappings = NatmusInfo.load_place_mappings()
+        self.qualifier_mappings = NatmusInfo.load_qualifier_mappings()
+        self.type_mappings = {  # per Template:I18n/objects
+            'Q132137': 'icon',
+            'Q3305213': 'painting'
+        }
+
+        self.nsid_wd_mapping = common.open_and_read_file(
+            self.local_nsid_mappings, as_json=True)
         # should this actually carry code
         # improve docstring
         #@todo is this needed? could wikidata etc. bit be moved from inti to here?
@@ -390,8 +381,9 @@ group by ?item ?itemLabel ?nsid
                     self.log(
                         u"Unused WD data 3: "
                         "multiple depicted in WD could be a match for nsid "
-                        u"%s: wd: %s" %
-                        (nsid, ', '.join(wd_painting_depicted)))
+                        u"obj_id: %s: nsid: %s: wd: %s" % (
+                            item.get_obj_id(), nsid,
+                            ', '.join(wd_painting_depicted)))
                 # no clever links found
                 item.add_to_tracker('issues', 'unlinked depicted')
                 return {
@@ -412,7 +404,7 @@ group by ?item ?itemLabel ?nsid
         """Get any non-anon depicted in a wd_painting object for an item."""
         wd_painting = self.wd_paintings.get(item.get_obj_id())
         if wd_painting and wd_painting.get('depicted_persons'):
-            depicted = set(wd_painting.get('depicted_persons')) - set(ANON_Q)
+            depicted = set(wd_painting.get('depicted_persons')) - set([ANON_Q])
             if depicted:
                 return list(depicted)
         return []
@@ -428,8 +420,9 @@ group by ?item ?itemLabel ?nsid
             if wd_painting_depicted:
                 #@todo: Could use this but we would need to get names for them
                 self.log(
-                    u"Unused WD data 2: depicted from WD when Lido had none: "
-                    u"%s, %s" %
+                    u"Unused WD data 2: " \
+                    "depicted from WD when Lido had none: "
+                    u"obj_id: %s, %s" %
                     (item.get_obj_id(), ', '.join(wd_painting_depicted)))
             return ''
 
@@ -547,7 +540,7 @@ group by ?item ?itemLabel ?nsid
         """Get any non-anon artists in a wd_painting object for an item."""
         wd_painting = self.wd_paintings.get(item.get_obj_id())
         if wd_painting and wd_painting.get('creators'):
-            creators = set(wd_painting.get('creators')) - set(ANON_Q)
+            creators = set(wd_painting.get('creators')) - set([ANON_Q])
             if creators:
                 return list(creators)
         return []
@@ -572,7 +565,6 @@ group by ?item ?itemLabel ?nsid
         wd_artist = self.wd_creators.get(nsid)
         if not name:  # no name means unknown
             # handle anons
-            self.anon_nsid.add(nsid)
             return None
         elif wd_artist and wd_artist.get('item') != ANON_Q:
             # use wikidata artist info if exists
@@ -599,13 +591,14 @@ group by ?item ?itemLabel ?nsid
                     }
         else:
             # log as missing in wikidata
-            if nsid not in self.non_wd_nsid.keys():
-                self.non_wd_nsid[nsid] = set()
+            if 'wd' not in self.nsid[nsid].keys():
+                self.nsid[nsid]['wd'] = set()
 
             # try to use info in wikidata painting object but only in
             # cases where wrong guesses are unlikely
             if len(wd_painting_artists) == 1 and artist_count < 2:
-                self.non_wd_nsid[nsid].add(wd_painting_artists[0])
+                self.nsid[nsid]['wd'].add(wd_painting_artists[0])
+
                 wd_painting = self.wd_paintings.get(item.get_obj_id())
                 creator_cats = wd_painting.get('creator_cats')
                 creator_templates = wd_painting.get('creator_templates')
@@ -632,9 +625,10 @@ group by ?item ?itemLabel ?nsid
                     # log cases where we are potentially not using data
                     self.log(
                         u"Unused WD data 1: "
-                        "multiple artists in WD could be a match for nsid "
-                        u"%s: wd: %s" %
-                        (nsid, ', '.join(wd_painting_artists)))
+                        "multiple artists in WD could be a match for "
+                        u"obj_id: %s, nsid: %s: wd: %s" % (
+                            item.get_obj_id(), nsid,
+                            ', '.join(wd_painting_artists)))
                 # no clever links found
                 item.add_to_tracker('issues', 'unlinked artist')
                 return {
@@ -838,6 +832,17 @@ group by ?item ?itemLabel ?nsid
     def run(self, in_file, base_name=None):
         """Overload run to add log outputting."""
         super(NatmusInfo, self).run(in_file, base_name)
+
+        # add/output connection logs
+        self.log(u'--------------------------------------------------nsid---')
+        for k, v in self.nsid.iteritems():
+            if v.get('wd'):
+                self.log(u'%s: %s' % (k, v))
+        self.log(u'--------------------------------------------------uri_ids---')
+        for k, v in self.uri_ids.iteritems():
+            if v.get('wd'):
+                self.log(u'%s: %s' % (k, v))
+
         if base_name:
             logfile = u'%s.log' % base_name
             common.open_and_write_file(logfile, '\n'.join(self.logger))
@@ -858,7 +863,8 @@ group by ?item ?itemLabel ?nsid
         options = {
             'in_file': None,
             'base_name': None,
-            'skip_non_wikidata': False
+            'skip_non_wikidata': False,
+            'nsid_file': None
         }
         natmus_options = {
             'lido_file': None,
@@ -872,6 +878,9 @@ group by ?item ?itemLabel ?nsid
                     helpers.convertFromCommandline(value)
             elif option == '-image_files':
                 natmus_options['image_files'] = \
+                    helpers.convertFromCommandline(value)
+            elif option == '-nsid_file':
+                options['nsid_file'] = \
                     helpers.convertFromCommandline(value)
             elif option == '-skip_non_wikidata':
                 options['skip_non_wikidata'] = True
@@ -890,9 +899,10 @@ group by ?item ?itemLabel ?nsid
         """Command line entry-point."""
         usage = \
             u'Usage:' \
-            u'\tpython Batches/Nationalmuseum/make_Natmus_info.py -lido_file:PATH -image_files:PATH -dir:PATH\n' \
+            u'\tpython Batches/Nationalmuseum/make_Natmus_info.py -lido_file:PATH -image_files:PATH -nsid_file:PATH -dir:PATH\n' \
             u'\t-lido_file:PATH path to lido metadata file\n' \
             u'\t-image_files:PATH path to image filenames file\n' \
+            u'\t-nsid_file:PATH path to local json with nsid mappings\n' \
             u'\t-skip_non_wikidata to skip images without a wikidata entry\n' \
             u'\t-dir:PATH specifies the path to the directory containing a ' \
             u'user_config.py file (optional)\n' \
@@ -954,6 +964,7 @@ class NatmusItem(object):
             if s.get('other_id'):
                 helpers.addOrIncrement(
                     natmus_info.uri_ids, s.get('other_id'), key='freq')
+                natmus_info.uri_ids[s.get('other_id')]['name'] = s.get('name')
 
         # drop unneded fields
         del d['images']
@@ -1202,6 +1213,5 @@ class NatmusItem(object):
 
 if __name__ == "__main__":
     # run as
-    # python Batches/Nationalmuseum/make_Natmus_info.py -lido_file:Batches/Nationalmuseum/processed_lido.json -image_files:Batches/Nationalmuseum/image_files.txt
+    # python Batches/Nationalmuseum/make_Natmus_info.py -lido_file:Batches/Nationalmuseum/processed_lido.json -image_files:Batches/Nationalmuseum/image_files.txt -nsid_file:Batches/Nationalmuseum/local_nsid_mapping.json
     NatmusInfo.main()
-    #NatmusInfo.test()
