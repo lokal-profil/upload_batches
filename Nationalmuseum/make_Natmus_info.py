@@ -37,13 +37,12 @@ class NatmusInfo(MakeBaseInfo):
         self.local_nsid_mappings = options['nsid_file']
 
         # load wikidata and static mappings
-        #@todo: load list of manual nsid/wikidata mappings (from logs etc)
         self.wd_paintings = NatmusInfo.load_painting_items()
         self.wd_creators = NatmusInfo.load_creator_items()
 
         # store various ids for potential later use
-        self.nsid = {}  # stores any nsid ids, their frequency and potential wikidata matches
-        self.uri_ids = {}  # stores any uri ids, their frequency and potential wikidata matches
+        self.nsid = {}  # nsid ids, frequency and potential wikidata matches
+        self.uri_ids = {}  # uri ids, frequency and potential wikidata matches
 
         # log file to handle skipped files
         self.logger = []
@@ -399,7 +398,7 @@ group by ?item ?itemLabel ?nsid
         """Given depicted_data return formatted output."""
         if depicted_data.get('link'):
             linked_string = u'[[:d:%s|%s]]' % (
-                depicted_data.get('item'), depicted_data.get('name'))
+                depicted_data.get('link'), depicted_data.get('name'))
             return linked_string
         else:
             return depicted_data.get('name')
@@ -422,13 +421,23 @@ group by ?item ?itemLabel ?nsid
         # handle no depictions
         if not lido_depicted:
             if wd_painting_depicted:
-                #@todo: Could use this but we would need to get names for them
-                self.log(
-                    u"Unused WD data 2: " \
-                    "depicted from WD when Lido had none: "
-                    u"obj_id: %s, %s" %
-                    (item.get_obj_id(), ', '.join(wd_painting_depicted)))
-            return ''
+                # track any cats
+                wd_painting = self.wd_paintings.get(item.get_obj_id())
+                if wd_painting.get('depicted_cats'):
+                    item.add_to_tracker(
+                        'depicted',
+                        wd_painting.get('depicted_cats'))
+
+                # Note that these don't come with a name only a qid
+                item.add_to_tracker('issues', 'wd depicted no name')
+                for qid in wd_painting_depicted:
+                    formatted_depicted.append(
+                        NatmusInfo.format_depicted_name({
+                            'link': qid,
+                            'name': qid
+                            }))
+            else:
+                return ''
 
         for depicted_data in lido_depicted:
             formatted_depicted.append(
@@ -505,7 +514,6 @@ group by ?item ?itemLabel ?nsid
 
         Return an empty string on failiure
         """
-        pass
         #@todo: but looks like the template cannot handle this anyway
         return ''
 
@@ -654,7 +662,7 @@ group by ?item ?itemLabel ?nsid
             return u'{{Creator:%s}}' % artist_data.get('template')
         elif artist_data.get('link'):
             linked_string = u'[[:d:%s|%s]]' % (
-                artist_data.get('item'), artist_data.get('name'))
+                artist_data.get('link'), artist_data.get('name'))
             if qualifier:
                 return qualifier['template'] % linked_string
             return linked_string
@@ -811,6 +819,7 @@ group by ?item ?itemLabel ?nsid
             'unlinked depicted': u'unlinked depicted',
             'unlinked artist': u'unlinked artist',
             'needs depicted cat': u'add depicted cat via wikidata and depicted to wikidata',
+            'wd depicted no name': u'add name to wd depicted'
         }
 
         cats = []
