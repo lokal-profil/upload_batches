@@ -9,3 +9,8 @@ data had already been used to create Wikidata items.
 
 * `make_Natmus_info.py` is used to create the Wikimedia Commons description
   pages associated with each image along with the filename to use on Commons.
+
+* `local_nsid_mappings.json` is a mapping of non-artist National museum ids (NSID)
+  to Wikidata entries. These were isolated and manually confirmed from the log
+  file produced by `make_Natmus_info`. After this `make_Natmus_info` was re-run
+  to make use of the new info.
