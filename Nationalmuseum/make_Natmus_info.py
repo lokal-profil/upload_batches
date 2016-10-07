@@ -130,7 +130,7 @@ class NatmusInfo(MakeBaseInfo):
                 u"keys: %s" % (key, ', '.join(data[0].keys())))
         new_data = {}
         for d in data:
-            k = d[key]
+            k = d[key].replace(entity_url, '')
             new_data[k] = {}
             for kk, value in d.iteritems():
                 value = value.split('|')
@@ -219,6 +219,26 @@ group by ?item ?itemLabel ?nsid
         pywikibot.output("Loaded %d artists from wikidata" % len(data))
         return NatmusInfo.clean_sparql_output(data, 'nsid')
 
+    @staticmethod
+    def load_local_nsid_commonscats(qids):
+        """
+        Get commonscats for the locally loaded list of qids.
+
+        qids: list of qids
+        """
+        query = u'''\
+# Nationalmuseum import
+SELECT ?item ?commons_cat WHERE {
+  ?item wdt:P373 ?commons_cat .
+  VALUES ?item { wd:%s } .
+}
+''' % ' wd:'.join(qids)
+        s = sparql.SparqlQuery()
+        data = s.select(query)
+        pywikibot.output(
+            "Loaded %d cats via wikidata from local mappings" % len(data))
+        return NatmusInfo.clean_sparql_output(data, 'item')
+
     def load_data(self, in_file):
         """
         Load the provided data files.
@@ -250,8 +270,15 @@ group by ?item ?itemLabel ?nsid
         # load mapping and store in uri_ids
         local_nsid_mapping = common.open_and_read_file(
             self.local_nsid_mappings, as_json=True)
+        # get common cat for the mapping
+        local_cats = NatmusInfo.load_local_nsid_commonscats(
+            local_nsid_mapping.values())
+
+        # store data in uri_ids
         for k, v in local_nsid_mapping.iteritems():
             self.uri_ids[k]['mapped'] = v
+            if v in local_cats.keys():
+                self.uri_ids[k]['cat'] = local_cats[v].get('commons_cat')
 
     def process_data(self, raw_data):
         """
@@ -295,7 +322,8 @@ group by ?item ?itemLabel ?nsid
         institution = u'{{Institution:Nationalmuseum Stockholm}}'
         sub_collection = item.get_subcollection()
         if sub_collection:
-            institution += u'\n |department           = %s' % sub_collection['link']
+            institution += \
+                u'\n |department           = %s' % sub_collection['link']
         return institution
 
     def get_creation_place(self, item):
@@ -346,8 +374,9 @@ group by ?item ?itemLabel ?nsid
         wd_artist = self.wd_creators.get(nsid)
 
         if wd_artist and wd_artist.get('item') != [ANON_Q]:
-            if wd_artist.get('commons_cat'):
-                item.add_to_tracker('depicted', wd_artist.get('commons_cat'))
+            if wd_artist.get('commons_cats'):
+                item.add_to_tracker('depicted', wd_artist.get('commons_cats'))
+
             return {
                 'link': wd_artist.get('item')[0],
                 'name': name
@@ -367,13 +396,17 @@ group by ?item ?itemLabel ?nsid
                     item.add_to_tracker(
                         'depicted',
                         wd_painting.get('depicted_cats'))
+
                 return {
                     'link': wd_painting_depicted[0],
                     'name': name
                     }
             elif self.uri_ids[nsid].get('mapped'):
                 # locally mapped to a wikidata entry
-                item.add_to_tracker('issues', 'needs depicted cat')
+                if self.uri_ids[nsid].get('cat'):
+                    item.add_to_tracker(
+                        'depicted', self.uri_ids[nsid].get('cat'))
+
                 return {
                     'link': self.uri_ids[nsid].get('mapped'),
                     'name': name
@@ -582,6 +615,8 @@ group by ?item ?itemLabel ?nsid
             # use wikidata artist info if exists
             if wd_artist.get('commons_cats'):
                 item.add_to_tracker('artist', wd_artist.get('commons_cats'))
+            else:
+                item.add_to_tracker('issues', 'wd artist no commonscat')
 
             creator_templates = wd_artist.get('creator_templates')
             qid = wd_artist.get('item')[0]
@@ -592,10 +627,6 @@ group by ?item ?itemLabel ?nsid
                     'qualifier': qualifier
                     }
             else:
-                #name = wd_artist.get('itemLabel') or artist['name']
-                if not name:
-                    pywikibot.error(
-                        "Failed to get a name for artist: %s" % qid)
                 return {
                     'link': qid,
                     'name': name,
@@ -618,6 +649,8 @@ group by ?item ?itemLabel ?nsid
                 # add creator cats
                 if creator_cats:
                     item.add_to_tracker('artist', creator_cats)
+                else:
+                    item.add_to_tracker('issues', 'wd artist no commonscat')
 
                 # try to use creator template and fall back on link
                 if creator_templates and len(creator_templates) == 1:
@@ -734,7 +767,7 @@ group by ?item ?itemLabel ?nsid
             'description': item.get_description(),
             'original_description': NatmusInfo.get_original_description(item),
             'date': NatmusInfo.get_date(item),
-            'medium': item.get_technique(),  #@todo could do better
+            'medium': item.get_technique(),  # @todo could do better
             'dimension': item.get_dimensions(),
             'institution': NatmusInfo.get_institution(item),
             'inscriptions': item.get_inscription(),
@@ -815,7 +848,8 @@ group by ?item ?itemLabel ?nsid
             'unlinked depicted': u'unlinked depicted',
             'unlinked artist': u'unlinked artist',
             'needs depicted cat': u'add depicted cat via wikidata and depicted to wikidata',
-            'wd depicted no name': u'add name to wd depicted'
+            'wd depicted no name': u'add name to wd depicted',
+            'wd artist no commonscat': u'add artist cat and commonscat to artist on wikidata',
         }
 
         cats = []
