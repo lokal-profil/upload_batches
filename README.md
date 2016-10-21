@@ -1,6 +1,6 @@
 ## About this repo
 This repo is a collection of various individual batch uploads based on
-[lokal-profil/BatchUploadTools](https://github.com/lokal-profil/BatchUploadTools)
+[lokal-profil/BatchUploadTools](https://github.com/lokal-profil/BatchUploadTools).
 It is expected that this repo is cloned into the `Batches` directory of a checked
 out verion of that repo.
 
