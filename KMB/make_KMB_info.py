@@ -65,11 +65,15 @@ class KMBInfo(MakeBaseInfo):
         """
         Update mapping files, load these and package appropriately.
 
+<<<<<<< 1cf6ee0acb0694801c35429c48a7301d77146dae
 <<<<<<< 614ef5112908865c36ab414a45e72ce29a4a0ea4
         :param update: whether to first download the latest mappings
 =======
         @param update: whether to first download the latest mappings
 >>>>>>> Make RAA-tools codebase for KMB compatible with BatchUploadTools
+=======
+        :param update: whether to first download the latest mappings
+>>>>>>> Fix various docstrings and frequently encountered issue with filenames
         """
         # Currently these are handled as substed templates.
         # redo as either:
@@ -87,6 +91,7 @@ class KMBInfo(MakeBaseInfo):
         The filename has the shape: descr - Collection - id
         and does not include filetype
 
+<<<<<<< 1cf6ee0acb0694801c35429c48a7301d77146dae
 <<<<<<< 614ef5112908865c36ab414a45e72ce29a4a0ea4
         :param item: the metadata for the media file in question
         :return: str
@@ -94,6 +99,10 @@ class KMBInfo(MakeBaseInfo):
         @param item: the metadata for the media file in question
         @return: str
 >>>>>>> Make RAA-tools codebase for KMB compatible with BatchUploadTools
+=======
+        :param item: the metadata for the media file in question
+        :return: str
+>>>>>>> Fix various docstrings and frequently encountered issue with filenames
         """
         return helpers.format_filename(item.get_description(), 'KMB', item.ID)
 
@@ -104,6 +113,7 @@ class KMBInfo(MakeBaseInfo):
         """
         Create the description template for a single KMB entry.
 
+<<<<<<< 1cf6ee0acb0694801c35429c48a7301d77146dae
 <<<<<<< 614ef5112908865c36ab414a45e72ce29a4a0ea4
         :param item: the metadata for the media file in question
         :return: str
@@ -111,6 +121,10 @@ class KMBInfo(MakeBaseInfo):
         @param item: the metadata for the media file in question
         @return: str
 >>>>>>> Make RAA-tools codebase for KMB compatible with BatchUploadTools
+=======
+        :param item: the metadata for the media file in question
+        :return: str
+>>>>>>> Fix various docstrings and frequently encountered issue with filenames
         """
         template_name = 'Kulturmiljöbild-image'
         template_data = OrderedDict()
@@ -165,12 +179,17 @@ class KMBInfo(MakeBaseInfo):
         """
         Extract any mapped keyword categories or depicted categories.
 
+<<<<<<< 1cf6ee0acb0694801c35429c48a7301d77146dae
 <<<<<<< 614ef5112908865c36ab414a45e72ce29a4a0ea4
         :param item: the KMBItem to analyse
         :return: list of categories (without "Category:" prefix)
 =======
         @param item: the item to analyse
 >>>>>>> Make RAA-tools codebase for KMB compatible with BatchUploadTools
+=======
+        :param item: the KMBItem to analyse
+        :return: list of categories (without "Category:" prefix)
+>>>>>>> Fix various docstrings and frequently encountered issue with filenames
         """
         cats = []
 
