@@ -1,3 +1,5 @@
+#!/usr/bin/python
+# -*- coding: utf-8  -*-
 """Get parsed data for whole kmb hitlist and store as json."""
 from __future__ import unicode_literals
 import urllib2
@@ -159,7 +161,7 @@ def process_date(entry):
 
 def process_byline(entry):
     """Handle unknown entries and rearrange names."""
-    if (entry['byline'] == 'Okänd, Okänd') or (entry['byline'] == 'Okänd'):
+    if entry['byline'] in ('Okänd, Okänd', 'Okänd'):
         entry['byline'] = '{{unknown}}'
     elif not entry['byline']:
         entry['byline'] = '{{not provided}}'
