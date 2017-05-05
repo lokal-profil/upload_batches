@@ -5,6 +5,7 @@ import codecs
 import time
 import json
 from xml.dom.minidom import parse
+import batchupload.helpers as helpers
 THROTTLE = 0.5
 
 
@@ -93,26 +94,8 @@ def parser(dom, A):
                 print "Empty 'ns5:itemKeyWord' in %s" % A['ID']
     # memory seems to be an issue so kill dom
     del dom, xmlTag
-    # create date field (can one exist and the other not?)
-    if A['dateFrom'] == A['dateTo']:
-        A['date'] = A['dateFrom']
-    elif (A['dateFrom'][:4] == A['dateTo'][:4]) and (A['dateFrom'][5:] == '01-01') and (A['dateTo'][5:] == '12-31'):
-        A['date'] = A['dateFrom'][:4]
-    else:
-        A['date'] = '{{other date|between|' + A['dateFrom'] + '|' + A['dateTo'] + '}}'
-    # rejigg byline
-    if (A['byline'] == 'Okänd, Okänd') or (A['byline'] == 'Okänd'):
-        A['byline'] = '{{unknown}}'
-    elif len(A['byline']) == 0:
-        A['byline'] = '{{not provided}}'
-    else:
-        bySplit = A['byline'].split(',')
-        if len(bySplit) == 2:
-            A['byline'] = (bySplit[1] + ' ' + bySplit[0]).strip()
-        elif len(bySplit) == 1:
-            A['byline'] = bySplit[0]
-        else:
-            pass
+    process_date(A)
+    process_byline(A)
     # ##Creator
     process_license(A)
     return A
@@ -158,6 +141,30 @@ def process_depicted(A, url):
         A['avbildar'].append('{{BBR|%s|m}}' % url[crop:])
     else:
         A['avbildar'].append(url)
+
+
+def process_date(entry):
+    """Create date field from dateTo and dateFrom."""
+    # (can one exist and the other not?)
+    if entry['dateFrom'] == entry['dateTo']:
+        entry['date'] = entry['dateFrom']
+    elif (entry['dateFrom'][:4] == entry['dateTo'][:4]) and \
+            (entry['dateFrom'][5:] == '01-01') and \
+            (entry['dateTo'][5:] == '12-31'):
+        entry['date'] = entry['dateFrom'][:4]
+    else:
+        entry['date'] = '{{other date|between|%s|%s}}' % (
+            entry['dateFrom'], entry['dateTo'])
+
+
+def process_byline(entry):
+    """Handle unknown entries and rearrange names."""
+    if (entry['byline'] == 'Okänd, Okänd') or (entry['byline'] == 'Okänd'):
+        entry['byline'] = '{{unknown}}'
+    elif not entry['byline']:
+        entry['byline'] = '{{not provided}}'
+    else:
+        entry['byline'] = helpers.flip_name(entry['byline'])
 
 
 # @todo: update this per new copyright rules - T164568
