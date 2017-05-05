@@ -245,11 +245,13 @@ class KMBItem(object):
 
     def get_source(self):
         """Produce a linked source statement."""
+        template = '{{Riksantikvarieämbetet cooperation project|coh}}'
         txt = ''
         if self.byline:
             txt += '%s / ' % self.byline
         txt += 'Kulturmiljöbild, Riksantikvarieämbetet'
-        return '[{url} {link_text}]'.format(url=self.source, link_text=txt)
+        return '[{url} {link_text}]\n{template}'.format(
+            url=self.source, link_text=txt, template=template)
 
     # @todo: use kommunkod/sockenkod to go via wikidata - T164576
     def get_depicted_place(self):
