@@ -1,12 +1,10 @@
 #!/usr/bin/python
 # -*- coding: utf-8  -*-
 """
-Information template production
+Construct Kulturmiljöbild-image templates and categories for KMB data.
 
-first mapping file generation could be separated (and if so also knav stuff)
-
-A known assumption is that in avbildad_namn any string containing exactly
-one comma is a person, and any others are assumed to be ships.
+Transforms the partially processed data from kmb_massload into a
+BatchUploadTools compliant json file.
 """
 from __future__ import unicode_literals
 from collections import OrderedDict
@@ -35,8 +33,8 @@ class KMBInfo(MakeBaseInfo):
         Return this as a dict with an entry per file which can be used for
         further processing.
 
-        @param in_file: the path to the metadata file
-        @return: dict
+        :param in_file: the path to the metadata file
+        :return: dict
         """
         return common.open_and_read_file(in_file, as_json=True)
 
@@ -45,6 +43,10 @@ class KMBInfo(MakeBaseInfo):
     def process_data(self, raw_data):
         """
         Take the loaded data and construct a KMBItem for each.
+
+        Populates self.data
+
+        :param raw_data: output from load_data()
         """
         d = {}
         for key, value in raw_data.iteritems():
@@ -63,7 +65,7 @@ class KMBInfo(MakeBaseInfo):
         """
         Update mapping files, load these and package appropriately.
 
-        @param update: whether to first download the latest mappings
+        :param update: whether to first download the latest mappings
         """
         # Currently these are handled as substed templates.
         # redo as either:
@@ -81,8 +83,8 @@ class KMBInfo(MakeBaseInfo):
         The filename has the shape: descr - Collection - id
         and does not include filetype
 
-        @param item: the metadata for the media file in question
-        @return: str
+        :param item: the metadata for the media file in question
+        :return: str
         """
         return helpers.format_filename(item.get_description(), 'KMB', item.ID)
 
@@ -93,8 +95,8 @@ class KMBInfo(MakeBaseInfo):
         """
         Create the description template for a single KMB entry.
 
-        @param item: the metadata for the media file in question
-        @return: str
+        :param item: the metadata for the media file in question
+        :return: str
         """
         template_name = 'Kulturmiljöbild-image'
         template_data = OrderedDict()
@@ -148,7 +150,8 @@ class KMBInfo(MakeBaseInfo):
         """
         Extract any mapped keyword categories or depicted categories.
 
-        @param item: the item to analyse
+        :param item: the KMBItem to analyse
+        :return: list of categories (without "Category:" prefix)
         """
         cats = []
 
@@ -172,9 +175,9 @@ class KMBInfo(MakeBaseInfo):
         """
         Produce maintanance categories related to a media file.
 
-        @param item: the metadata for the media file in question
-        @param content_cats: any content categories for the file
-        @return: list of categories (without "Category:" prefix)
+        :param item: the metadata for the media file in question
+        :param content_cats: any content categories for the file
+        :return: list of categories (without "Category:" prefix)
         """
         pass
         cats = []
@@ -209,7 +212,7 @@ class KMBItem(object):
         """
         Create a KMBItem item from a dict where each key is an attribute.
 
-        @param initial_data: dict of data to set up item with
+        :param initial_data: dict of data to set up item with
         """
         # ensure all required varaibles are present
         required_entries = ('latitude', 'longitude', 'avbildar')
@@ -221,11 +224,7 @@ class KMBItem(object):
             setattr(self, key, value)
 
     def get_wiki_description(self):
-        """
-        Generate the wiki description.
-
-        @todo: change to comma separation
-        """
+        """Generate the wikitext description."""
         wiki_descritpion = ''
         if self.motiv != self.namn:
             wiki_descritpion = self.motiv + ' '
@@ -237,17 +236,15 @@ class KMBItem(object):
     # @todo: construct a fallback for descriptions,
     #        and ensure meta cats tie in to this
     def get_description(self):
-        """Given an item construct an appropriate description."""
+        """Construct an appropriate description."""
         if self.namn:
-            return self.namn
+            return self.namn.replace('S:t', 'St')
         else:
             raise NotImplementedError
 
     # @todo: use kommunkod/sockenkod to go via wikidata - T164576
     def get_depicted_place(self):
-        """
-        given an item get a linked version of the depicted Place
-        """
+        """Get a linked version of the depicted place."""
         s_triggers = ('a', 'o', 'u', 'å', 'e', 'i', 'y', 'ä', 'ö', 's', 'x')
         depicted_place = None
         if not self.land or self.land == 'se':
