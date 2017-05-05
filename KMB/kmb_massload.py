@@ -9,6 +9,11 @@ THROTTLE = 0.5
 
 
 def parser(dom, A):
+    """
+    Parse and process the xml metadata into a dict.
+
+    This is all legacy code from RAA-tools
+    """
     A['problem'] = None
     # tags to get
     tagDict = {'namn': ('ns5:itemLabel', None),            # namn
@@ -116,7 +121,7 @@ def parser(dom, A):
 # @todo: consider using the kulturarvsdata tool to resolve bbr type
 def process_depicted(A, url):
     """
-    Process any FMI or BBR entries in depicted and store back in entry.
+    Process any FMIS or BBR entries in depicted and store back in entry.
 
     Also set bbr, fmis, shm if these are encountered.
 
