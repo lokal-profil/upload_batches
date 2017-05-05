@@ -178,7 +178,7 @@ def process_license(entry):
             pass
         else:
             param = '|%s}}' % entry['byline']
-        entry['license'] = '{{CC-BY-RAÄ‎%s' % param
+        entry['license'] = '{{CC-BY-RAÄ%s' % param
     else:
         entry['problem'] = (
             'Det verkar tyvärr som om licensen inte är fri. Copyright="%s", License="%s".<br/>'
