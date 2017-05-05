@@ -109,6 +109,7 @@ class KMBInfo(MakeBaseInfo):
         template_data['permission'] = item.license
         template_data['ID'] = item.ID
         template_data['bildbeteckning'] = item.bildbeteckning
+        template_data['source'] = item.get_source()
         template_data['notes'] = ''
         txt = helpers.output_block_template(template_name, template_data, 0)
 
@@ -241,6 +242,14 @@ class KMBItem(object):
             return self.namn.replace('S:t', 'St')
         else:
             raise NotImplementedError
+
+    def get_source(self):
+        """Produce a linked source statement."""
+        txt = ''
+        if self.byline:
+            txt += '%s / ' % self.byline
+        txt += 'Kulturmiljöbild, Riksantikvarieämbetet'
+        return '[{url} {link_text}]'.format(url=self.source, link_text=txt)
 
     # @todo: use kommunkod/sockenkod to go via wikidata - T164576
     def get_depicted_place(self):
