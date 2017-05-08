@@ -229,7 +229,8 @@ class KMBItem(object):
 
         * self.motiv is either the same as the name or a free-text description
             of what the image depicts.
-        * self.avbildar is a list of wikitext templates (bbr, fmis, shm).
+        * self.avbildar is a list of wikitext templates (bbr, fmis, shm) which
+            all start with a linebreak.
 
         :return: str
         """
