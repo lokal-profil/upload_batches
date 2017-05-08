@@ -117,7 +117,6 @@ class KMBInfo(MakeBaseInfo):
         self.mappings['tags'] = common.open_and_read_file(
             tags_file, as_json=True)
 
-    # @todo: Remove need for offline list file T165141
     def get_photographer_mapping(self, photographers_list_file):
         """
         Load needed values from Wikidata items for matched photographers.
