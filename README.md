@@ -8,9 +8,10 @@ To run it you will have to install `BatchUploadTools` using:
 *Note*: You might have to add the `--process-dependency-links` flag to the above
 command if you are running a different version of pywikibot from the required one.
 
-These projects are mainly here for my own use and to illustrate how BatchUploadTools
-can be used. There is no guarantee that any of them will work at any given time
-since I'm not keeping them in sync with any later changes to BatchUploadTools.
+These projects are mainly here for my own use and to illustrate how
+BatchUploadTools can be used. There is no guarantee that any of them will work
+with versions of BatchUploadTools later than that given in the
+`requirements.txt` in each directory.
 
 As such they may also include implicit assumptions about the indata, hard-coded
 mappings or insufficient documentation. There may also be nonsensical comments
@@ -28,5 +29,5 @@ precautions.
 * **`KMB`**: A batch upload of images from the National Heritage Board's
   *Kulturmiljöbild*. A list of image ids to upload was provided by the
   organisation and the metadata for these was pre-fetched using `kmb_massload.py`.
-  The code is based hevily on pre-existing code in
+  The code is based heavily on pre-existing code in
   [lokal-profil/RAA-tools](https://github.com/lokal-profil/RAA-tools).
