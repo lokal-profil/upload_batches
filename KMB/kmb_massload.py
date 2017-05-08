@@ -110,8 +110,8 @@ def process_depicted(A, url):
 
     Also set bbr, fmis, shm if these are encountered.
 
-    Note that the url need not be shm/fmi/bbr etc. and the might be
-    multiple entries of different or same types.
+    Note that the url need not be for a shm/fmi/bbr etc. entry and there might
+    be multiple entries of different or same types.
     """
     if url.startswith('http://kulturarvsdata.se/raa/fmi/'):
         A['fmis'] = True
