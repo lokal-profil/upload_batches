@@ -161,7 +161,7 @@ def process_date(entry):
 
 def process_byline(entry):
     """Handle unknown entries and rearrange names."""
-    if entry['byline'] in ('Okänd, Okänd', 'Okänd'):
+    if entry['byline'] in ('Okänd, Okänd', 'Okänd', 'Okänd Fotograf'):
         entry['byline'] = '{{unknown}}'
     elif not entry['byline']:
         entry['byline'] = '{{not provided}}'
