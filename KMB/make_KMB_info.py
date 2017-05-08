@@ -173,7 +173,7 @@ class KMBInfo(MakeBaseInfo):
     # @todo: Implement creator from mapping - T164567
     def generate_meta_cats(self, item, content_cats):
         """
-        Produce maintanance categories related to a media file.
+        Produce maintenance categories related to a media file.
 
         :param item: the metadata for the media file in question
         :param content_cats: any content categories for the file
@@ -189,9 +189,9 @@ class KMBInfo(MakeBaseInfo):
 
         # problem cats
         if not content_cats:
-            cats.append(self.make_maintanance_cat('improve categories'))
+            cats.append(self.make_maintenance_cat('improve categories'))
         # if not item.get_description():
-        #     cats.append(self.make_maintanance_cat('add description'))
+        #     cats.append(self.make_maintenance_cat('add description'))
 
         # creator cats are classified as meta
         # @todo: '{{safesubst:User:Lokal_Profil/nycklar/creators|%s|c}} % item.byline
