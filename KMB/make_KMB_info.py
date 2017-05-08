@@ -160,7 +160,7 @@ class KMBInfo(MakeBaseInfo):
             cats.append('Archaeological monuments in %s' % item.landskap)
             cats.append('Archaeological monuments in %s County' % item.lan)
         if item.bbr:
-            cats.append('Protected buildings in Sweden')
+            cats.append('Listed buildings in Sweden')
 
         # must be better to do this via safesubst
         for tagg in item.tagg:
