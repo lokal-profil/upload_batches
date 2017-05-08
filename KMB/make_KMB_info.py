@@ -247,7 +247,8 @@ class KMBItem(object):
     def get_description(self):
         """Construct an appropriate description."""
         if self.namn:
-            return self.namn.replace('S:t', 'St')
+            # handle problematic common colon in name
+            return self.namn.replace('S:t', 'Sankt')
         else:
             raise NotImplementedError
 
