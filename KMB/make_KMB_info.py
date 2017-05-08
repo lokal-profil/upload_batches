@@ -224,14 +224,23 @@ class KMBItem(object):
             setattr(self, key, value)
 
     def get_wiki_description(self):
-        """Generate the wikitext description."""
-        wiki_descritpion = ''
-        if self.motiv != self.namn:
-            wiki_descritpion = self.motiv + ' '
-        if self.avbildar:
-            wiki_descritpion += ' '.join(self.avbildar)
+        """
+        Generate the wikitext description.
 
-        return wiki_descritpion.strip()
+        * self.motiv is either the same as the name or a free-text description
+            of what the image depicts.
+        * self.avbildar is a list of wikitext templates (bbr, fmis, shm).
+
+        :return: str
+        """
+        wiki_description = ''
+        if self.motiv != self.namn:
+            wiki_description = self.motiv + ' '
+
+        if self.avbildar:
+            wiki_description += ' '.join(self.avbildar)
+
+        return wiki_description.strip()
 
     # @todo: construct a fallback for descriptions,
     #        and ensure meta cats tie in to this
