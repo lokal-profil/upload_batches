@@ -161,7 +161,7 @@ class KMBInfo(MakeBaseInfo):
             cats.append('Archaeological monuments in %s' % item.landskap)
             cats.append('Archaeological monuments in %s County' % item.lan)
         if item.bbr:
-            cats.append('Protected buildings in Sweden')
+            cats.append('Listed buildings in Sweden')
 
         # must be better to do this via safesubst
         for tagg in item.tagg:
@@ -174,7 +174,7 @@ class KMBInfo(MakeBaseInfo):
     # @todo: Implement creator from mapping - T164567
     def generate_meta_cats(self, item, content_cats):
         """
-        Produce maintanance categories related to a media file.
+        Produce maintenance categories related to a media file.
 
         :param item: the metadata for the media file in question
         :param content_cats: any content categories for the file
@@ -190,9 +190,9 @@ class KMBInfo(MakeBaseInfo):
 
         # problem cats
         if not content_cats:
-            cats.append(self.make_maintanance_cat('improve categories'))
+            cats.append(self.make_maintenance_cat('improve categories'))
         # if not item.get_description():
-        #     cats.append(self.make_maintanance_cat('add description'))
+        #     cats.append(self.make_maintenance_cat('add description'))
 
         # creator cats are classified as meta
         # @todo: '{{safesubst:User:Lokal_Profil/nycklar/creators|%s|c}} % item.byline
@@ -203,7 +203,17 @@ class KMBInfo(MakeBaseInfo):
     @classmethod
     def main(cls, *args):
         """Command line entry-point."""
-        super(KMBInfo, cls).main(*args)
+        usage = (
+            'Usage:'
+            '\tpython make_info.py -in_file:PATH -dir:PATH\n'
+            '\t-in_file:PATH path to metadata file\n'
+            '\t-dir:PATH specifies the path to the directory containing a '
+            'user_config.py file (optional)\n'
+            '\tExample:\n'
+            '\tpython make_KMB_info.py -in_file:KMB/kmb_data.json '
+            '-base_name:kmb_output -dir:KMB\n'
+        )
+        super(KMBInfo, cls).main(usage=usage, *args)
 
 
 class KMBItem(object):
@@ -225,21 +235,32 @@ class KMBItem(object):
             setattr(self, key, value)
 
     def get_wiki_description(self):
-        """Generate the wikitext description."""
-        wiki_descritpion = ''
-        if self.motiv != self.namn:
-            wiki_descritpion = self.motiv + ' '
-        if self.avbildar:
-            wiki_descritpion += ' '.join(self.avbildar)
+        """
+        Generate the wikitext description.
 
-        return wiki_descritpion.strip()
+        * self.motiv is either the same as the name or a free-text description
+            of what the image depicts.
+        * self.avbildar is a list of wikitext templates (bbr, fmis, shm) which
+            all start with a linebreak.
+
+        :return: str
+        """
+        wiki_description = ''
+        if self.motiv != self.namn:
+            wiki_description = self.motiv + ' '
+
+        if self.avbildar:
+            wiki_description += ' '.join(self.avbildar)
+
+        return wiki_description.strip()
 
     # @todo: construct a fallback for descriptions,
     #        and ensure meta cats tie in to this
     def get_description(self):
         """Construct an appropriate description."""
         if self.namn:
-            return self.namn.replace('S:t', 'St')
+            # handle problematic common colon in name
+            return self.namn.replace('S:t', 'Sankt')
         else:
             raise NotImplementedError
 
