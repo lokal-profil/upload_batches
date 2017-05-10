@@ -65,16 +65,16 @@ class KMBInfo(MakeBaseInfo):
         self.data = d
 
     # @todo: break out substed lists as mappings - T164567
-    def load_mappings(self, update):
+    def load_mappings(self, update_mappings):
         """
         Update mapping files, load these and package appropriately.
 
-        :param update: whether to first download the latest mappings
+        :param update_mappings: whether to first download the latest mappings
         """
         socken_file = os.path.join(MAPPINGS_DIR, 'socken.json')
         kommun_file = os.path.join(MAPPINGS_DIR, 'kommun.json')
 
-        if update:
+        if update_mappings:
             self.mappings['socken'] = KMBInfo.query_to_lookup(
                 'SELECT ?item ?value WHERE {?item wdt:P777 ?value}')
             self.mappings['kommun'] = KMBInfo.query_to_lookup(
