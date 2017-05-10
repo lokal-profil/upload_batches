@@ -241,7 +241,6 @@ class KMBInfo(MakeBaseInfo):
 
         return list(cats)
 
-    # @todo: add arg for not updating mappings
     @classmethod
     def main(cls, *args):
         """Command line entry-point."""
