@@ -90,14 +90,6 @@ class KMBInfo(MakeBaseInfo):
             self.mappings['kommun'] = common.open_and_read_file(
                 kommun_file, as_json=True)
 
-        # Currently these are handled as substed templates.
-        # redo as either:
-        # * offline mappings: If so consider re-jiging make_info to not assume
-        #   it is alway an online table.
-        # * online tables: If so consider re-jiging make_info to not assume
-        #   these need alway be dumped a offline files first.
-        pass
-
     # @todo: don't we want any other values?
     @staticmethod
     def query_to_lookup(query, item_label='item', value_label='value'):
