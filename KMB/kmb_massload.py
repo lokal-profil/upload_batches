@@ -171,7 +171,9 @@ def process_byline(entry):
 
 def process_license(entry):
     """
-    Identify the license and store the back in entry.
+    Identify the license, as wikitext, and store as new property.
+
+    Must be called after process_byline().
 
     Don't include name/byline if unknown.
     """
