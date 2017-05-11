@@ -174,6 +174,8 @@ def process_license(entry):
     Identify the license, as wikitext, and store as new property.
 
     Must be called after process_byline().
+    Possible licenses are listed in
+    http://kulturarvsdata.se/resurser/license/license.owl
 
     Don't include name/byline if unknown.
     """
