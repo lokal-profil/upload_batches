@@ -178,36 +178,44 @@ def process_license(entry):
     Don't include name/byline if unknown.
     """
     entry['copyright'] = entry['copyright'].strip()
+    template = None
+    byline = None
     license_text = None
 
     if entry['license']:
         trim = 'http://kulturarvsdata.se/resurser/License#'
         entry['license'] = entry['license'].strip()[len(trim):]
 
+    # determine template
     if (entry['license'] == 'pdmark') or \
             (entry['copyright'] == 'Utgången upphovsrätt'):
-        license_text = '{{PD-Sweden-photo}}'
+        template = 'PD-Sweden-photo'
     elif entry['license'] == 'by':
-        byline = None
+        template = 'CC-BY-2.5'
+    elif entry['license'] == 'by-sa':
         template = 'CC-BY-SA-2.5'
+    elif entry['license'] == 'cc0':
+        template = 'CC0'
+
+    # determine byline if possible
+    if template in ('CC-BY-2.5', 'CC-BY-SA-2.5'):
+        byline = []
         if entry['byline'] not in ('{{unknown}}', '{{not provided}}'):
-            byline = '|{0}'.format(entry['byline'])
+            byline.append(entry['byline'])
 
         if entry['copyright'] == 'RAÄ':
-            template = 'CC-BY-RAÄ'
+            byline.append('Riksantikvarieämbetet')
         elif entry['copyright']:
-            if byline:
-                byline = '{0} / {1}'.format(byline, entry['copyright'])
-            else:
-                byline = '|{0}'.format(entry['copyright'])
+            byline.append(entry['copyright'])
 
-        license_text = '{{%s%s}}' % (template, byline)
-    elif entry['license'] in ('cc0', 'by-sa'):
-        # valid license which aren't yet implemented
-        raise NotImplementedError
+    if template:
+        if byline:
+            license_text = '{{%s|%s}}' % (template, ' / '.join(byline))
+        else:
+            license_text = '{{%s}}' % template
     else:
         entry['problem'].append(
-            'Det verkar tyvärr som om licensen inte är fri. '
+            "It looks like the license isn't free. "
             "Copyright='{0}', License='{1}'.".format(
                 entry['copyright'], entry['license']))
     entry['license_text'] = license_text
