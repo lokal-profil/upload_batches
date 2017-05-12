@@ -167,15 +167,20 @@ class KMBInfo(MakeBaseInfo):
             a list, a string or an integer.
         :return: generator
         """
-        if url.startswith('http://'):
-            url = url[len('http://'):]
+        raw_url = url
+        default_protocol = 'http'
+
+        protocol, _, url = url.partition('://')
+        if not url:
+            url = raw_url
+            protocol = default_protocol
 
         if isinstance(namespace, list):
             namespace = '|'.join(namespace)
 
         g = pywikibot.data.api.ListGenerator(
             "exturlusage", euquery=url, site=self.commons,
-            eunamespace=namespace, euprops='title|url')
+            eunamespace=namespace, euprotocol=protocol, euprops='title|url')
         return g
 
     # @note: this differs from the one created in RAA-tools
