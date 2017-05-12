@@ -68,7 +68,6 @@ class KMBInfo(MakeBaseInfo):
 
         self.data = d
 
-    # @todo: break out substed lists as mappings - T164567
     def load_mappings(self, update_mappings):
         """
         Update mapping files, load these and package appropriately.
@@ -112,6 +111,7 @@ class KMBInfo(MakeBaseInfo):
         self.mappings['taggs'] = common.open_and_read_file(
             taggs_file, as_json=True)
 
+    # @todo: Remove need for offline list file T165141
     def get_photographer_mapping(self, photographers_list_file):
         """
         Load needed values from Wikidata items for matched photographers.
