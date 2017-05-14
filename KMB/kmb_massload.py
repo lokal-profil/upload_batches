@@ -225,17 +225,20 @@ def process_license(entry):
 def kmb_wrapper(idno):
     """Get partially processed dataobject for a given kmb id."""
     A = {'ID': idno, 'problem': []}
+    url = 'http://kulturarvsdata.se/raa/kmb/{0}'.format(idno)
     try:
-        fil = urllib2.urlopen('http://kulturarvsdata.se/raa/kmb/' + idno)
+        fil = urllib2.urlopen(url)
     except urllib2.HTTPError as e:
-        A['problem'].append(
-            '{0}: http://kulturarvsdata.se/raa/kmb/{1}'.format(e, idno))
+        A['problem'].append('{0}: {1}'.format(e, url))
         print A['problem'][0]
-        return A
-    dom = parse(fil)
-    fil.close()
-    del fil
-    return parser(dom, A)
+    else:
+        dom = parse(fil)
+        A = parser(dom, A)
+    finally:
+        fil.close()
+        del fil
+
+    return A
 
 
 def load_list(filename='kmb_hitlist.json'):
