@@ -234,7 +234,6 @@ def kmb_wrapper(idno):
     else:
         dom = parse(fil)
         A = parser(dom, A)
-    finally:
         fil.close()
         del fil
 
