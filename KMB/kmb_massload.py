@@ -227,15 +227,15 @@ def kmb_wrapper(idno):
     A = {'ID': idno, 'problem': []}
     url = 'http://kulturarvsdata.se/raa/kmb/{0}'.format(idno)
     try:
-        fil = urllib2.urlopen(url)
+        f = urllib2.urlopen(url)
     except urllib2.HTTPError as e:
         A['problem'].append('{0}: {1}'.format(e, url))
         print A['problem'][0]
     else:
-        dom = parse(fil)
+        dom = parse(f)
         A = parser(dom, A)
-        fil.close()
-        del fil
+        f.close()
+        del f
 
     return A
 
