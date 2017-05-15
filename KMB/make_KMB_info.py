@@ -379,7 +379,7 @@ class KMBInfo(MakeBaseInfo):
             item.make_tag_categories(self.category_cache)
 
         # @todo: Add parish/municipality categorisation when needed
-        #        i.e. if not item.needs_place_cat.
+        #        i.e. if not item.needs_place_cat - T164576
 
         return list(item.content_cats)
 
