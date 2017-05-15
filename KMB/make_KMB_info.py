@@ -77,7 +77,7 @@ class KMBInfo(MakeBaseInfo):
         socken_file = os.path.join(MAPPINGS_DIR, 'socken.json')
         kommun_file = os.path.join(MAPPINGS_DIR, 'kommun.json')
         countries_file = os.path.join(MAPPINGS_DIR, 'countries_for_cats.json')
-        taggs_file = os.path.join(MAPPINGS_DIR, 'taggs.json')
+        tags_file = os.path.join(MAPPINGS_DIR, 'tags.json')
         photographer_file = os.path.join(MAPPINGS_DIR, 'photographers.json')
         photographers_list_file = os.path.join(
             MAPPINGS_DIR, 'photographers_list.json')
@@ -108,8 +108,8 @@ class KMBInfo(MakeBaseInfo):
 
         self.mappings['countries'] = common.open_and_read_file(
             countries_file, as_json=True)
-        self.mappings['taggs'] = common.open_and_read_file(
-            taggs_file, as_json=True)
+        self.mappings['tags'] = common.open_and_read_file(
+            tags_file, as_json=True)
 
     # @todo: Remove need for offline list file T165141
     def get_photographer_mapping(self, photographers_list_file):
@@ -400,9 +400,9 @@ class KMBItem(object):
 
         :param cache: cache for category existence
         """
-        tag_map = self.kmb_info.mappings['taggs']
+        tag_map = self.kmb_info.mappings['tags']
         country_map = self.kmb_info.mappings['countries']
-        for tag in self.tagg:
+        for tag in self.tag:
             if tag in tag_map:
                 cat = None
                 if not self.land or self.land == 'se' and \
