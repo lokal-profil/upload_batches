@@ -63,8 +63,9 @@ def parser(dom, A):
             A['longitude'] = coords[0][:8]
         else:
             A['problem'].append("Coord was not a point: '{0}'".format(cs))
-    # do visualizes separately need not be shm/fmi/bbr etc. can be multiple
-    A['bbr'] = A['fmis'] = False
+    # do visualizes separately need not be fmi/bbr etc. can be multiple
+    A['bbr'] = set()
+    A['fmis'] = set()
     xmlTag = dom.getElementsByTagName('ns5:visualizes')
     if not len(xmlTag) == 0:
         A['avbildar'] = []
@@ -103,45 +104,59 @@ def parser(dom, A):
 
 
 # @todo: consider using the kulturarvsdata tool to resolve bbr type
-def process_depicted(A, url):
+def process_depicted(entry, url):
     """
     Process any FMIS or BBR entries in depicted and store back in entry.
 
-    Also set bbr, fmis, shm if these are encountered.
+    Also store bbr, fmis ids that are encountered.
 
-    Note that the url need not be for a shm/fmi/bbr etc. entry and there might
+    Note that the url need not be for a fmi/bbr etc. entry and there might
     be multiple entries of different or same types.
     """
-    if url.startswith('http://kulturarvsdata.se/raa/fmi/'):
-        A['fmis'] = True
-        crop = len('http://kulturarvsdata.se/raa/fmi/')
-        A['avbildar'].append('{{Fornminne|%s}}' % url[crop:])
-    elif url.startswith('http://kulturarvsdata.se/raa/bbr/'):
-        A['bbr'] = True
-        crop = len('http://kulturarvsdata.se/raa/bbr/')
-        num = url[crop:crop+3]
-        typ = ''
-        if num == '214':
-            typ = '|b'
-        elif num == '213':
-            typ = '|a'
-        elif num == '212':
-            typ = '|m'
-        A['avbildar'].append('{{BBR|%s%s}}' % (url[crop:], typ))
-    elif url.startswith('http://kulturarvsdata.se/raa/bbra/'):
-        A['bbr'] = True
-        crop = len('http://kulturarvsdata.se/raa/bbra/')
-        A['avbildar'].append('{{BBR|%s|a}}' % url[crop:])
-    elif url.startswith('http://kulturarvsdata.se/raa/bbrb/'):
-        A['bbr'] = True
-        crop = len('http://kulturarvsdata.se/raa/bbrb/')
-        A['avbildar'].append('{{BBR|%s|b}}' % url[crop:])
-    elif url.startswith('http://kulturarvsdata.se/raa/bbrm/'):
-        A['bbr'] = True
-        crop = len('http://kulturarvsdata.se/raa/bbrm/')
-        A['avbildar'].append('{{BBR|%s|m}}' % url[crop:])
-    else:
-        A['avbildar'].append(url)
+    mapping = {
+        'http://kulturarvsdata.se/raa/fmi/': {
+            'template': '{{Fornminne|%s}}',
+            'type_key': 'fmis'
+        },
+        'http://kulturarvsdata.se/raa/bbra/': {
+            'template': '{{BBR|%s|a}}',
+            'type_key': 'bbr'
+        },
+        'http://kulturarvsdata.se/raa/bbrb/': {
+            'template': '{{BBR|%s|b}}',
+            'type_key': 'bbr'
+        },
+        'http://kulturarvsdata.se/raa/bbrm/': {
+            'template': '{{BBR|%s|m}}',
+            'type_key': 'bbr'
+        }
+    }
+    found = False
+    for pattern, rule in mapping.iteritems():
+        if url.startswith(pattern):
+            idno = url[len(pattern):].strip()
+            entry[rule['type_key']].add(idno)
+            entry['avbildar'].append(rule['template'] % idno)
+            found = True
+            break
+
+    if not found:
+        pattern = 'http://kulturarvsdata.se/raa/bbr/'
+        if url.startswith(pattern):
+            idno = url[len(pattern):].strip()
+            template = '{{BBR|%s%s}}'
+            entry['bbr'].add(idno)
+            num = idno[:3]
+            typ = ''
+            if num == '214':
+                typ = '|b'
+            elif num == '213':
+                typ = '|a'
+            elif num == '212':
+                typ = '|m'
+            entry['avbildar'].append(template % (idno, typ))
+        else:
+            entry['avbildar'].append(url)
 
 
 def process_date(entry):
