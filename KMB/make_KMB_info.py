@@ -9,6 +9,7 @@ BatchUploadTools compliant json file.
 from __future__ import unicode_literals
 from collections import OrderedDict
 import os.path
+import requests
 
 import pywikibot
 from pywikibot.data import sparql
@@ -253,6 +254,52 @@ class KMBInfo(MakeBaseInfo):
             eunamespace=namespace, euprotocol=protocol, euprops='title|url')
         return g
 
+    @staticmethod
+    def get_commonscat_from_heritage(dataset, data=None, props=None,
+                                     limit=None, srcontinue=None):
+        """
+        Get all commonscat entries in a dataset from the heritage database.
+
+        This is needed until all of the data exists on Wikidata.
+        Also returns the wikidata id if any is known.
+
+        :param dataset: string describing the dataset e.g. se-bbr
+        :param data: dict to which information should be added
+        :param props: properties to request. Defaults to 'id', 'commonscat' and
+            'wd_item'.
+        :param limit: the number of records to request at once
+            (uses api default unless provided)
+        :param srcontinue: continuation parameter to attach to the request
+        :return: dict with found data
+        """
+        props = props or ('id', 'commonscat', 'wd_item')
+        data = data or {}
+        base_url = 'https://tools.wmflabs.org/heritage/api/api.php?action=search&format=json&srwithcommonscat=1'  # noqa E501
+        url = '{0}&srcountry={1}&props={2}'.format(
+            base_url, dataset, '|'.join(props))
+
+        if limit:
+            url += '&limit={0}'.format(limit)
+
+        if srcontinue:
+            url += '&srcontinue={0}'.format(srcontinue)
+
+        #@todo add a try/except
+        r = requests.get(url)
+        req_data = r.json()
+
+        for entry in req_data['monuments']:
+            data[entry['id']] = {
+                'wd': entry['wd_item'],
+                'cat': entry['commonscat']}
+
+        if req_data.get('continue'):
+            KMBInfo.get_commonscat_from_heritage(
+                dataset, data=data, props=props, limit=limit,
+                srcontinue=req_data['continue']['srcontinue'])
+
+        return data
+
     # @note: this differs from the one created in RAA-tools
     def generate_filename(self, item):
         """
@@ -266,9 +313,6 @@ class KMBInfo(MakeBaseInfo):
         """
         return helpers.format_filename(item.get_description(), 'KMB', item.ID)
 
-    # @todo:
-    # * Add a collaboration + COH template in the source field - T164569
-    # * Add the source link to the source field - T164569
     def make_info_template(self, item):
         """
         Create the description template for a single KMB entry.
