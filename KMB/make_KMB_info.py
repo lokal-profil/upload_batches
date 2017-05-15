@@ -202,7 +202,7 @@ class KMBInfo(MakeBaseInfo):
         self.find_files_from_pattern(
             'http://kulturarvsdata.se/raa/kmb/', kmb_files)
 
-        # convert sets to list (to allow for json storage
+        # convert sets to list (to allow for json storage)
         for k, v in kmb_files.iteritems():
             kmb_files[k] = list(v)
 
