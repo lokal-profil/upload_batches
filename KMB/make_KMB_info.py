@@ -374,10 +374,10 @@ class KMBInfo(MakeBaseInfo):
         :return: list of categories (without "Category:" prefix)
         """
         # depicted
-        found_commonscat = item.make_commonscat_categories()
+        found_commonscat = item.make_commonscat_categories(self.category_cache)
 
         # @todo: Add parish/municipality categorisation when needed
-        #        i.e. if no bbr or fmis on muni level
+        #        i.e. if not item.needs_place_cat.
 
         # add tag categories unless a commonscat was found
         if not found_commonscat:
@@ -476,7 +476,8 @@ class KMBItem(object):
         self.wd = {}  # store for relevant Wikidata identifiers
         self.content_cats = set()  # content relevant categories without prefix
         self.meta_cats = set()  # meta/maintenance proto categories
-        self.kmb_info = kmb_info
+        self.kmb_info = kmb_info  # the KBMInfo instance creating this KMBItem
+        self.needs_place_cat = True  # if item needs categorisation by place
 
     def get_other_versions(self):
         """
@@ -525,39 +526,68 @@ class KMBItem(object):
         else:
             raise NotImplementedError
 
-    def make_commonscat_categories(self, cache:
+    def make_commonscat_categories(self, cache):
         """
-        Set categories based on depicted bbr/fmis entries.
+        Set categories based on depicted BBR/FMIS entries.
 
         Sets a commonscat if one is found else a fallback category for the
         object type.
 
-        Populates self.content_cats.
+        Populates self.content_cats and modifies self.needs_place_cat.
 
         :param cache: cache for category existence
         :return: bool whether a comonscat was found
         """
         commonscat_map = self.kmb_info.mappings['commonscat']
 
-        cats = set()
         found_commonscat = False
         for fmis_id in self.fmis:
             if fmis_id in commonscat_map['fmis']:
                 found_commonscat = True
-                cats.add(commonscat_map['fmis'][fmis_id]['cat'])
+                self.content_cats.add(commonscat_map['fmis'][fmis_id]['cat'])
             else:
-                # @todo: FMIS default category on municipal level - T164719
-                cats.add('Archaeological monuments in %s' % self.landskap)
-                cats.add('Archaeological monuments in %s County' % self.lan)
+                self.make_default_fmis_category(cache)
         for bbr_id in self.bbr:
             if bbr_id in commonscat_map['bbr']:
                 found_commonscat = True
-                cats.add(commonscat_map['bbr'][bbr_id]['cat'])
+                self.content_cats.add(commonscat_map['bbr'][bbr_id]['cat'])
             else:
-                cats.add('Listed buildings in Sweden')
+                self.content_cats.add('Listed buildings in Sweden')
 
-        self.content_cats |= cats
+        if found_commonscat:
+            self.needs_place_cat = False
+
         return found_commonscat
+
+    def make_default_fmis_category(self, cache):
+        """
+        Set FMIS default categories based municipality.
+
+        Makes a guess for the category name. If not found it defaults to
+        County (Län) + Land (Landskap) categories.
+
+        Populates self.content_cats and modifies self.needs_place_cat.
+
+        :param cache: cache for category existence
+        """
+        test_cat = None
+        if self.kommunName:
+            test_cat = 'Archaeological monuments in {} Municipality'.format(
+                self.kommunName)
+            if not self.kmb_info.category_exists(test_cat, cache):
+                test_cat = 'Archaeological monuments in {}'.format(
+                    self.kommunName)
+                if not self.kmb_info.category_exists(test_cat, cache):
+                    test_cat = None
+
+        if test_cat:
+            self.needs_place_cat = False
+            self.content_cats.add(test_cat)
+        else:
+            self.content_cats.add(
+                'Archaeological monuments in %s' % self.landskap)
+            self.content_cats.add(
+                'Archaeological monuments in %s County' % self.lan)
 
     def make_tag_categories(self, cache):
         """
