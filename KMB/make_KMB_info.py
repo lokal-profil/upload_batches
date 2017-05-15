@@ -364,8 +364,6 @@ class KMBInfo(MakeBaseInfo):
         """
         return item.source
 
-    # @todo:
-    # * Add parish/municipality categorisation when needed - T164576
     def generate_content_cats(self, item):
         """
         Extract any mapped keyword categories or depicted categories.
@@ -376,12 +374,12 @@ class KMBInfo(MakeBaseInfo):
         # depicted
         found_commonscat = item.make_commonscat_categories(self.category_cache)
 
-        # @todo: Add parish/municipality categorisation when needed
-        #        i.e. if not item.needs_place_cat.
-
         # add tag categories unless a commonscat was found
         if not found_commonscat:
             item.make_tag_categories(self.category_cache)
+
+        # @todo: Add parish/municipality categorisation when needed
+        #        i.e. if not item.needs_place_cat.
 
         return list(item.content_cats)
 
@@ -593,9 +591,10 @@ class KMBItem(object):
         """
         Construct categories from the provided tags.
 
-        The mapping follows three scenarios:
+        The mapping follows four scenarios:
+        * A guessed, and validated, category on municipal level in Sweden.
         * An exact category for Sweden.
-        * A guessed, and later validated, category where 'Sweden' is replaced
+        * A guessed, and validated, category where 'Sweden' is replaced
           by the country name in the Sweden specific category.
         * A default category (either a "to be categorised by country" category
           or the subject category without any country information.
@@ -612,6 +611,15 @@ class KMBItem(object):
                 if not self.land or self.land == 'se' and \
                         tag_map[tag].get('SE'):
                     cat = tag_map[tag].get('SE')
+
+                    # attempt municipal categorisation
+                    if self.kommunName:
+                        test_cat = tag_map[tag].get('SE').replace(
+                            'Sweden', '{} Municipality'.format(
+                                self.kommunName))
+                        if self.kmb_info.category_exists(test_cat, cache):
+                            self.needs_place_cat = False
+                            cat = test_cat
                 elif self.land.upper() in country_map and \
                         tag_map[tag].get('base'):
                     # guess a category
