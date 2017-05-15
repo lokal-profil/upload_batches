@@ -100,6 +100,10 @@ def parser(dom, A):
     process_byline(A)
     # ##Creator
     process_license(A)
+
+    # convert sets to lists to allow for json storage)
+    A['bbr'] = list(A['bbr'])
+    A['fmis'] = list(A['fmis'])
     return A
 
 
