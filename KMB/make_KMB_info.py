@@ -606,6 +606,11 @@ class KMBItem(object):
         tag_map = self.kmb_info.mappings['tags']
         country_map = self.kmb_info.mappings['countries']
         for tag in self.tag:
+            if (self.fmis and tag == 'Fornminnen') or \
+                    (self.bbr and tag.startswith('Byggnadsminnen')):
+                # avoid similar cat to fallback in make_commonscat_categories
+                continue
+
             if tag in tag_map:
                 cat = None
                 if not self.land or self.land == 'se' and \
