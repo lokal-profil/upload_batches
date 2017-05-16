@@ -559,10 +559,10 @@ class KMBItem(object):
 
     def make_default_fmis_category(self, cache):
         """
-        Set FMIS default categories based municipality.
+        Set FMIS default categories based on municipality.
 
         Makes a guess for the category name. If not found it defaults to
-        County (Län) + Land (Landskap) categories.
+        County (Län) + Province (Landskap) categories.
 
         Populates self.content_cats and modifies self.needs_place_cat.
 
@@ -628,11 +628,11 @@ class KMBItem(object):
                 elif self.land.upper() in country_map and \
                         tag_map[tag].get('base'):
                     # guess a category
-                    cat = tag_map[tag].get('base').format(
+                    test_cat = tag_map[tag].get('base').format(
                         country_map(self.land.upper()))
-                    if not self.kmb_info.category_exists(cat, cache):
-                        # ensure category exists
-                        cat = None
+                    if self.kmb_info.category_exists(test_cat, cache):
+                        self.needs_place_cat = False
+                        cat = test_cat
 
                 if not cat:
                     # fallback independent of country
