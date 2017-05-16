@@ -11,6 +11,49 @@ import batchupload.helpers as helpers
 THROTTLE = 0.5
 
 
+class BbrTemplate(object):
+    """Convenience class for BBR template formatting and logic."""
+
+    def __init__(self, idno, bbr_type=None):
+        """Initialise the template with an idno and optional type."""
+        self.template_type = 'bbr'
+        self.idno = idno
+        self.bbr_type = bbr_type
+
+    def output(self):
+        """Output the template as wikitext."""
+        if self.determine_type():
+            return '{{BBR|%s|%s}}' % (self.idno, self.bbr_type)
+        return '{{BBR|%s}}' % self.idno
+
+    # @todo: consider using the kulturarvsdata tool to resolve bbr type
+    def determine_type(self):
+        """Determine the bbr_type if not already known."""
+        if not self.bbr_type:
+            num = self.idno[:3]
+            if num == '214':
+                self.bbr_type = 'b'
+            elif num == '213':
+                self.bbr_type = 'a'
+            elif num == '212':
+                self.bbr_type = 'm'
+
+        return (self.bbr_type is not None)
+
+
+class FmisTemplate(object):
+    """Convenience class for FMIS template formatting and logic."""
+
+    def __init__(self, idno):
+        """Initialise the template with an idno."""
+        self.template_type = 'fmis'
+        self.idno = idno
+
+    def output(self):
+        """Output the template as wikitext."""
+        return '{{Fornminne|%s}}' % self.idno
+
+
 def parser(dom, A):
     """
     Parse and process the xml metadata into a dict.
@@ -51,6 +94,7 @@ def parser(dom, A):
                 A[tag] = xmlTag[0].attributes[tagDict[tag][1]].value[len(tagDict[tag][2]):]
         else:
             A[tag] = ''
+
     # do coordinates separately
     xmlTag = dom.getElementsByTagName('georss:where')
     if not len(xmlTag) == 0:
@@ -63,7 +107,8 @@ def parser(dom, A):
             A['longitude'] = coords[0][:8]
         else:
             A['problem'].append("Coord was not a point: '{0}'".format(cs))
-    # do visualizes separately need not be fmi/bbr etc. can be multiple
+
+    # do ns5:visualizes separately
     A['bbr'] = set()
     A['fmis'] = set()
     xmlTag = dom.getElementsByTagName('ns5:visualizes')
@@ -72,6 +117,7 @@ def parser(dom, A):
         for x in xmlTag:
             url = x.attributes['rdf:resource'].value
             process_depicted(A, url)
+
     # and an attempt at determining categories
     xmlTag = dom.getElementsByTagName('ns5:itemClassName')
     if not len(xmlTag) == 0:
@@ -107,60 +153,38 @@ def parser(dom, A):
     return A
 
 
-# @todo: consider using the kulturarvsdata tool to resolve bbr type
 def process_depicted(entry, url):
     """
     Process any FMIS or BBR entries in depicted and store back in entry.
 
     Also store bbr, fmis ids that are encountered.
 
-    Note that the url need not be for a fmi/bbr etc. entry and there might
-    be multiple entries of different or same types.
+    Note that the url need not be for an fmi/bbr entry and there might
+    be multiple entries of different or the same type.
     """
+    idno = url.split('/')[-1]
     mapping = {
-        'http://kulturarvsdata.se/raa/fmi/': {
-            'template': '{{Fornminne|%s}}',
-            'type_key': 'fmis'
-        },
-        'http://kulturarvsdata.se/raa/bbra/': {
-            'template': '{{BBR|%s|a}}',
-            'type_key': 'bbr'
-        },
-        'http://kulturarvsdata.se/raa/bbrb/': {
-            'template': '{{BBR|%s|b}}',
-            'type_key': 'bbr'
-        },
-        'http://kulturarvsdata.se/raa/bbrm/': {
-            'template': '{{BBR|%s|m}}',
-            'type_key': 'bbr'
-        }
+        'http://kulturarvsdata.se/raa/fmi/': FmisTemplate(idno),
+        'http://kulturarvsdata.se/raa/bbra/': BbrTemplate(idno, 'a'),
+        'http://kulturarvsdata.se/raa/bbrb/': BbrTemplate(idno, 'b'),
+        'http://kulturarvsdata.se/raa/bbrm/': BbrTemplate(idno, 'm'),
+        'http://kulturarvsdata.se/raa/bbr/': BbrTemplate(idno)
     }
-    found = False
-    for pattern, rule in mapping.iteritems():
+    avbildar = None
+    for pattern, template in mapping.iteritems():
         if url.startswith(pattern):
-            idno = url[len(pattern):].strip()
-            entry[rule['type_key']].add(idno)
-            entry['avbildar'].append(rule['template'] % idno)
-            found = True
+            if idno != url[len(pattern):].strip():
+                raise ValueError(
+                    "Depicted started with '{0}' but idno has wrong "
+                    "format: {1}".format(pattern, url))
+            entry[template.template_type].add(idno)
+            avbildar = template.output()
             break
 
-    if not found:
-        pattern = 'http://kulturarvsdata.se/raa/bbr/'
-        if url.startswith(pattern):
-            idno = url[len(pattern):].strip()
-            template = '{{BBR|%s%s}}'
-            entry['bbr'].add(idno)
-            num = idno[:3]
-            typ = ''
-            if num == '214':
-                typ = '|b'
-            elif num == '213':
-                typ = '|a'
-            elif num == '212':
-                typ = '|m'
-            entry['avbildar'].append(template % (idno, typ))
-        else:
-            entry['avbildar'].append(url)
+    if not avbildar:
+        avbildar = url
+
+    entry['avbildar'].append(avbildar)
 
 
 def process_date(entry):
