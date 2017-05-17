@@ -86,16 +86,19 @@ class KMBInfo(MakeBaseInfo):
         photographer_page = 'Institution:Riksantikvarieämbetet/KMB/creators'
 
         if update_mappings:
+            query_props = {'commonscat': 'commonscat'}
             self.mappings['socken'] = KMBInfo.query_to_lookup(
                 'SELECT ?item ?value ?commonscat WHERE {'
                 '?item wdt:P777 ?value'
                 ' . OPTIONAL { ?item wdt:P373 ?commonscat }'
-                '}')
+                '}',
+                props=query_props)
             self.mappings['kommun'] = KMBInfo.query_to_lookup(
                 'SELECT ?item ?value ?commonscat WHERE {'
                 '?item wdt:P525 ?value'
                 ' . OPTIONAL { ?item wdt:P373 ?commonscat }'
-                '}')
+                '}',
+                props=query_props)
             self.mappings['photographers'] = self.get_photographer_mapping(
                 photographer_page)
             self.mappings['kmb_files'] = self.get_existing_kmb_files()
@@ -198,6 +201,10 @@ class KMBInfo(MakeBaseInfo):
             else:
                 lookup[key] = {'wd': qid}
                 for prop, label in props.iteritems():
+                    if entry[prop] and not entry[prop].type:
+                        # pywikibot sparql has issues with unicode
+                        # this can be dumped when we switch to PY3
+                        entry[prop] = repr(entry[prop]).decode('utf-8')
                     lookup[key][label] = entry[prop]
         return lookup
 
