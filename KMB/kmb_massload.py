@@ -151,6 +151,7 @@ def parser(dom, A):
     A['bbr'] = list(A['bbr'])
     A['fmis'] = list(A['fmis'])
     normalise_ids(A)
+    handle_gotland(A)
     return A
 
 
@@ -162,6 +163,19 @@ def normalise_ids(entry):
         entry['socken'] = '{:04d}'.format(int(entry['socken']))  # zero pad
     if entry['land']:
         entry['land'] = entry['land'].upper()
+
+
+def handle_gotland(entry):
+    """
+    Ensure Gotland has municipality code and not just county/province.
+
+    Relies on the fact that county/province and municipality are equivalent
+    in this one case. Which is probably also why this particular municipality
+    id is frequently left out.
+    """
+    if not entry['kommun'] and 'Gotland' in (entry['lan'], entry['landskap']):
+        entry['kommun'] = '0980'  # Gotlands kommun
+        entry['kommunName'] = 'Gotland'
 
 
 def process_depicted(entry, url):

@@ -772,11 +772,8 @@ class KMBItem(object):
         socken_map = self.kmb_info.mappings['socken']
         depicted_place = None
         if not self.land or self.land == 'SE':
-            if 'Gotland' in (self.lan, self.landskap) and not self.kommun:
-                # since lan/landskap/kommun are equivalent in this case
-                self.kommun = '0980'  # Gotlands kommun
-
             depicted_place = '{{Country|1=SE}}'
+
             if self.kommun:
                 self.wd['kommun'] = kommun_map[self.kommun]['wd']
                 depicted_place += ', {{city|%s}}' % self.wd['kommun']
