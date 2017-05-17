@@ -87,9 +87,15 @@ class KMBInfo(MakeBaseInfo):
 
         if update_mappings:
             self.mappings['socken'] = KMBInfo.query_to_lookup(
-                'SELECT ?item ?value WHERE {?item wdt:P777 ?value}')
+                'SELECT ?item ?value ?commonscat WHERE {'
+                '?item wdt:P777 ?value'
+                ' . OPTIONAL { ?item wdt:P373 ?commonscat }'
+                '}')
             self.mappings['kommun'] = KMBInfo.query_to_lookup(
-                'SELECT ?item ?value WHERE {?item wdt:P525 ?value}')
+                'SELECT ?item ?value ?commonscat WHERE {'
+                '?item wdt:P525 ?value'
+                ' . OPTIONAL { ?item wdt:P373 ?commonscat }'
+                '}')
             self.mappings['photographers'] = self.get_photographer_mapping(
                 photographer_page)
             self.mappings['kmb_files'] = self.get_existing_kmb_files()
@@ -163,14 +169,20 @@ class KMBInfo(MakeBaseInfo):
                 qid, photographer_props, self.photographer_cache)
         return photographers
 
-    # @todo: don't we want any other values?
     @staticmethod
-    def query_to_lookup(query, item_label='item', value_label='value'):
+    def query_to_lookup(query, item_label='item', value_label='value',
+                        props=None):
         """
         Fetch sparql result and return it as a lookup table for wikidata id.
 
+        If props are not provided the returned dict simply consists of
+        value_label:item_label pairs. If props are provided the returned dict
+        becomes value_label:{'wd':item_label, other props}
+
         :param item_label: the label of the selected wikidata id
         :param value_label: the label of the selected lookup key
+        :param props: dict of other properties to save from the results using
+            the format label_in_sparql:key_in_output.
         :return: dict
         """
         wdqs = sparql.SparqlQuery()
@@ -179,7 +191,14 @@ class KMBInfo(MakeBaseInfo):
         for entry in result:
             if entry[value_label] in lookup:
                 raise pywikibot.Error('Non-unique value in lookup')
-            lookup[str(entry[value_label])] = entry[item_label].getID()
+            key = str(entry[value_label])
+            qid = entry[item_label].getID()
+            if not props:
+                lookup[key] = qid
+            else:
+                lookup[key] = {'wd': qid}
+                for prop, label in props.iteritems():
+                    lookup[key][label] = entry[prop]
         return lookup
 
     # @todo:move to BatchUploadTools?
@@ -398,6 +417,8 @@ class KMBInfo(MakeBaseInfo):
 
         # @todo: Add parish/municipality categorisation when needed
         #        i.e. if not item.needs_place_cat - T164576
+        if item.needs_place_cat:
+            item.make_place_category()
 
         return list(item.content_cats)
 
@@ -695,6 +716,29 @@ class KMBItem(object):
         return '[{url} {link_text}]\n{template}'.format(
             url=self.source, link_text=txt, template=template)
 
+    #@todo: move zero-padding to kmb_massload
+    def make_place_category(self):
+        """Add category for parish or municipality."""
+        kommun_map = self.kmb_info.mappings['kommun']
+        socken_map = self.kmb_info.mappings['socken']
+        cat = None
+
+        if not self.land or self.land == 'se':
+            if self.socken:
+                socken_id = '{:04d}'.format(int(self.socken))  # zero pad
+                cat = socken_map[socken_id]['commonscat']
+
+            if not cat and self.kommun:
+                kommun_id = '{:04d}'.format(int(self.kommun))  # zero pad
+                cat = kommun_map[kommun_id]['commonscat']
+
+        if cat:
+            self.content_cats.add(cat)
+            return True
+        else:
+            self.meta_cats.add('needing categorisation (place)')
+            return False
+
     def get_depicted_place(self):
         """
         Get a linked version of the depicted place.
@@ -714,12 +758,12 @@ class KMBItem(object):
             depicted_place = '{{Country|1=SE}}'
             if self.kommun:
                 kommun_id = '{:04d}'.format(int(self.kommun))  # zero pad
-                self.wd['kommun'] = kommun_map[kommun_id]
+                self.wd['kommun'] = kommun_map[kommun_id]['wd']
                 depicted_place += ', {{city|%s}}' % self.wd['kommun']
 
                 if self.socken:
                     socken_id = '{:04d}'.format(int(self.socken))  # zero pad
-                    self.wd['socken'] = socken_map[socken_id]
+                    self.wd['socken'] = socken_map[socken_id]['wd']
                     depicted_place += ', {{city|%s}}' % self.wd['socken']
             else:
                 if self.lan:
