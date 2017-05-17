@@ -86,18 +86,12 @@ class KMBInfo(MakeBaseInfo):
         photographer_page = 'Institution:Riksantikvarieämbetet/KMB/creators'
 
         if update_mappings:
-            query_props = {'commonscat': 'commonscat'}
+            query_props = {'P373': 'commonscat'}
             self.mappings['socken'] = KMBInfo.query_to_lookup(
-                'SELECT ?item ?value ?commonscat WHERE {'
-                '?item wdt:P777 ?value'
-                ' . OPTIONAL { ?item wdt:P373 ?commonscat }'
-                '}',
+                KMBInfo.build_query('P777', optional_props=query_props.keys()),
                 props=query_props)
             self.mappings['kommun'] = KMBInfo.query_to_lookup(
-                'SELECT ?item ?value ?commonscat WHERE {'
-                '?item wdt:P525 ?value'
-                ' . OPTIONAL { ?item wdt:P373 ?commonscat }'
-                '}',
+                KMBInfo.build_query('P525', optional_props=query_props.keys()),
                 props=query_props)
             self.mappings['photographers'] = self.get_photographer_mapping(
                 photographer_page)
@@ -172,6 +166,31 @@ class KMBInfo(MakeBaseInfo):
                 qid, photographer_props, self.photographer_cache)
         return photographers
 
+    # @todo:move to BatchUploadTools?
+    @staticmethod
+    def build_query(main_prop, optional_props=None):
+        """
+        Construct a sparql query returning items containing a given property.
+
+        The main_prop is given the label 'value' whereas any optional_props
+        use the property pid as the label.
+
+        :param main_prop: property pid (with P-prefix) to require
+        :param optional_props: list of other properties pids to include as
+            optional
+        """
+        optional_props = optional_props or []
+        query = 'SELECT ?item ?value '
+        if optional_props:
+            query += '?{0} '.format(' ?'.join(optional_props))
+        query += 'WHERE { '
+        query += '?item wdt:{0} ?value . '.format(main_prop)
+        for prop in optional_props:
+            query += 'OPTIONAL { ?item wdt:%s ?%s } ' % (prop, prop)
+        query += '}'
+        return query
+
+    # @todo:move to BatchUploadTools?
     @staticmethod
     def query_to_lookup(query, item_label='item', value_label='value',
                         props=None):
