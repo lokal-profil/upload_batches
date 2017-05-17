@@ -415,8 +415,7 @@ class KMBInfo(MakeBaseInfo):
         if not found_commonscat:
             item.make_tag_categories(self.category_cache)
 
-        # @todo: Add parish/municipality categorisation when needed
-        #        i.e. if not item.needs_place_cat - T164576
+        # Add parish/municipality categorisation when needed
         if item.needs_place_cat:
             item.make_place_category()
 
@@ -652,7 +651,7 @@ class KMBItem(object):
 
             if tag in tag_map:
                 cat = None
-                if not self.land or self.land == 'se' and \
+                if not self.land or self.land == 'SE' and \
                         tag_map[tag].get('SE'):
                     cat = tag_map[tag].get('SE')
 
@@ -664,11 +663,10 @@ class KMBItem(object):
                         if self.kmb_info.category_exists(test_cat, cache):
                             self.needs_place_cat = False
                             cat = test_cat
-                elif self.land.upper() in country_map and \
-                        tag_map[tag].get('base'):
+                elif self.land in country_map and tag_map[tag].get('base'):
                     # guess a category
                     test_cat = tag_map[tag].get('base').format(
-                        country_map(self.land.upper()))
+                        country_map(self.land))
                     if self.kmb_info.category_exists(test_cat, cache):
                         self.needs_place_cat = False
                         cat = test_cat
@@ -716,21 +714,18 @@ class KMBItem(object):
         return '[{url} {link_text}]\n{template}'.format(
             url=self.source, link_text=txt, template=template)
 
-    #@todo: move zero-padding to kmb_massload
     def make_place_category(self):
         """Add category for parish or municipality."""
         kommun_map = self.kmb_info.mappings['kommun']
         socken_map = self.kmb_info.mappings['socken']
         cat = None
 
-        if not self.land or self.land == 'se':
+        if not self.land or self.land == 'SE':
             if self.socken:
-                socken_id = '{:04d}'.format(int(self.socken))  # zero pad
-                cat = socken_map[socken_id]['commonscat']
+                cat = socken_map[self.socken]['commonscat']
 
             if not cat and self.kommun:
-                kommun_id = '{:04d}'.format(int(self.kommun))  # zero pad
-                cat = kommun_map[kommun_id]['commonscat']
+                cat = kommun_map[self.kommun]['commonscat']
 
         if cat:
             self.content_cats.add(cat)
@@ -750,20 +745,18 @@ class KMBItem(object):
         kommun_map = self.kmb_info.mappings['kommun']
         socken_map = self.kmb_info.mappings['socken']
         depicted_place = None
-        if not self.land or self.land == 'se':
+        if not self.land or self.land == 'SE':
             if 'Gotland' in (self.lan, self.landskap) and not self.kommun:
                 # since lan/landskap/kommun are equivalent in this case
                 self.kommun = '0980'  # Gotlands kommun
 
             depicted_place = '{{Country|1=SE}}'
             if self.kommun:
-                kommun_id = '{:04d}'.format(int(self.kommun))  # zero pad
-                self.wd['kommun'] = kommun_map[kommun_id]['wd']
+                self.wd['kommun'] = kommun_map[self.kommun]['wd']
                 depicted_place += ', {{city|%s}}' % self.wd['kommun']
 
                 if self.socken:
-                    socken_id = '{:04d}'.format(int(self.socken))  # zero pad
-                    self.wd['socken'] = socken_map[socken_id]['wd']
+                    self.wd['socken'] = socken_map[self.socken]['wd']
                     depicted_place += ', {{city|%s}}' % self.wd['socken']
             else:
                 if self.lan:
@@ -774,7 +767,7 @@ class KMBItem(object):
                     self.meta_cats.add(
                         'needing categorisation (no municipality)')
         else:
-            depicted_place = '{{Country|1=%s}}' % self.land.upper()
+            depicted_place = '{{Country|1=%s}}' % self.land
             self.meta_cats.add('needing categorisation (not from Sweden)')
 
         return depicted_place
