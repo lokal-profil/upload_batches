@@ -23,6 +23,7 @@ from batchupload.make_info import MakeBaseInfo
 MAPPINGS_DIR = 'mappings'
 BATCH_CAT = 'Media contributed by RAÄ'  # stem for maintenance categories
 BATCH_DATE = '2017-05'  # branch for this particular batch upload
+LOGFILE = 'kmb_processing.log'
 
 
 class KMBInfo(MakeBaseInfo):
@@ -35,7 +36,7 @@ class KMBInfo(MakeBaseInfo):
         self.wikidata = pywikibot.Site('wikidata', 'wikidata')
         self.category_cache = {}  # cache for category_exists()
         self.photographer_cache = {}
-        self.log = common.LogFile('', 'kmb_processing.log')
+        self.log = common.LogFile('', LOGFILE)
 
     def load_data(self, in_file):
         """
@@ -63,7 +64,7 @@ class KMBInfo(MakeBaseInfo):
         for key, value in raw_data.iteritems():
             item = KMBItem(value, self)
             if item.problem:
-                text = 'The {0} image was skipped because of: {1}'.format(
+                text = '{0} -- image was skipped because of: {1}'.format(
                     item.ID, '\n'.join(item.problem))
                 pywikibot.output(text)
                 self.log.write(text)
@@ -677,9 +678,8 @@ class KMBItem(object):
             if self.kmb_info.category_exists(test_cat, cache):
                 self.content_cats.add(test_cat)
             else:
-                self.log.write(
-                    'Had to fall back on "Listed buildings in Sweden" for '
-                    'image with id "{}".'.format(self.ID))
+                self.log.write('{0} -- Had to fall back on "Listed buildings '
+                               'in Sweden".'.format(self.ID))
                 self.content_cats.add('Listed buildings in Sweden')
 
     def municipal_subcategory(self, cat_base, cache):

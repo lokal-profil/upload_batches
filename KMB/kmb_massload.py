@@ -8,7 +8,10 @@ from xml.dom.minidom import parse
 import pywikibot
 import batchupload.helpers as helpers
 import batchupload.common as common
+
+
 THROTTLE = 0.5
+LOGFILE = 'kmb_massloading.log'
 
 
 class BbrTemplate(object):
@@ -154,7 +157,7 @@ def process_tags(entry, dom, label, xml_tag, log):
             entry[label].append(element.childNodes[0].data.strip())
         except IndexError:
             # Means data for this field was mising
-            log.write("Empty '{0}' in {1}".format(xml_tag, entry['ID']))
+            log.write("{0} -- Empty '{1}'".format(entry['ID'], xml_tag))
 
 
 def normalise_ids(entry):
@@ -299,7 +302,7 @@ def kmb_wrapper(idno, log):
     try:
         f = urllib2.urlopen(url)
     except urllib2.HTTPError as e:
-        A['problem'].append('{0}: {1}'.format(e, url))
+        A['problem'].append('{0} -- {1}: {2}'.format(idno, e, url))
         log.write(A['problem'][0])
     else:
         dom = parse(f)
@@ -323,7 +326,7 @@ def output_blob(data, filename='kmb_data.json'):
 
 def run(start=None, end=None):
     """Get parsed data for whole kmb hitlist and store as json."""
-    log = common.LogFile('', 'kmb_massloading.log')
+    log = common.LogFile('', LOGFILE)
     hitlist = load_list()
     if start or end:
         hitlist = hitlist[start:end]
