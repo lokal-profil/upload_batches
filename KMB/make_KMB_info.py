@@ -670,6 +670,7 @@ class KMBItem(object):
             if self.kmb_info.category_exists(test_cat, cache):
                 self.content_cats.add(test_cat)
             else:
+                # @todo: add an entry to the log here
                 self.content_cats.add('Listed buildings in Sweden')
 
     def municipal_subcategory(self, cat_base, cache):
