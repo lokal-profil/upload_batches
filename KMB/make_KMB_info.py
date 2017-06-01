@@ -736,9 +736,10 @@ class KMBItem(object):
             return intersection[0]
         elif len(intersection) > 1:
             pywikibot.warning(
-                "Found two primary classes. Need to rethink the logic. "
+                "Found {num} primary classes. Need to rethink the logic. "
                 "{idno}: '{primary}'".format(
-                    idno=self.ID, primary="', '".join(intersection)))
+                    num=len(intersection), idno=self.ID,
+                    primary="', '".join(intersection)))
 
     def make_item_class_categories(self, cache):
         """
