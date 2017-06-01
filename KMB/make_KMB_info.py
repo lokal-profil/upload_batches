@@ -576,6 +576,7 @@ class KMBItem(object):
         """
         Generate the wikitext description.
 
+        * self.beskrivning is a free-text description of the image.
         * self.motiv is either the same as the name or a free-text description
             of what the image depicts.
         * self.avbildar is a list of wikitext templates (bbr, fmis, shm) which
@@ -583,9 +584,9 @@ class KMBItem(object):
 
         :return: str
         """
-        wiki_description = ''
-        if self.motiv != self.namn:
-            wiki_description = self.motiv + ' '
+        wiki_description = '{}.'.format(self.beskrivning.rstrip(' .'))
+        if (self.motiv != self.namn) and (self.motiv != self.beskrivning):
+            wiki_description += '\n{} '.format(self.motiv)
 
         if self.avbildar:
             wiki_description += ' '.join(self.avbildar)
