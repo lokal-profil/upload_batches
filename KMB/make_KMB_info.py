@@ -721,6 +721,13 @@ class KMBItem(object):
         """
         Discover which, if any, of the item classes is the primary one.
 
+        If primary_classes contains (castle, runestone, chicken)
+        then:
+        * item_classes: (human construct, building, castle) returns castle
+        * item_classes: (human construct, building, church) returns None
+        * item_classes: (building, runestone, chicken) raises a warning and
+          returns None
+
         :return: the matching class
         """
         primary_classes = self.kmb_info.mappings['primary_classes']
