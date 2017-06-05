@@ -667,7 +667,7 @@ class KMBItem(object):
         :param cache: cache for category existence
         """
         muni_cat = self.municipal_subcategory(
-            'Archaeological monuments', cache)
+            'Archaeological monuments in {}', cache)
 
         if muni_cat:
             self.needs_place_cat = False
@@ -689,7 +689,7 @@ class KMBItem(object):
 
         :param cache: cache for category existence
         """
-        muni_cat = self.municipal_subcategory('Listed buildings', cache)
+        muni_cat = self.municipal_subcategory('Listed buildings in {}', cache)
 
         if muni_cat:
             self.needs_place_cat = False
@@ -707,18 +707,17 @@ class KMBItem(object):
         """
         Find a suitable subcategory on municipality level for a category stem.
 
-        :param cat_base: the base name/stem of the category
-            e.g. "Listed buildings"
+        :param cat_base: the base name/stem of the category. Provided as a
+            format string with one unnamed field. E.g. "Listed buildings in {}"
         :param cache: cache for category existence
         :return: a successful category match or None
         """
         test_cat = None
         if self.kommunName:
-            test_cat = '{cat_base} in {muni} Municipality'.format(
-                cat_base=cat_base, muni=self.kommunName)
+            test_cat = cat_base.format(
+                '{muni} Municipality'.format(muni=self.kommunName))
             if not self.kmb_info.category_exists(test_cat, cache):
-                test_cat = '{cat_base} in {muni}'.format(
-                    cat_base=cat_base, muni=self.kommunName)
+                test_cat = cat_base.format(self.kommunName)
                 if not self.kmb_info.category_exists(test_cat, cache):
                     test_cat = None
         return test_cat
@@ -800,13 +799,12 @@ class KMBItem(object):
             if (not self.land or self.land == 'SE') and tag_map[tag].get('SE'):
                 cat = tag_map[tag].get('SE')
 
-                # attempt municipal categorisation
-                if self.kommunName:
-                    test_cat = tag_map[tag].get('SE').replace(
-                        'Sweden', '{} Municipality'.format(self.kommunName))
-                    if self.kmb_info.category_exists(test_cat, cache):
-                        self.needs_place_cat = False
-                        cat = test_cat
+                # attempt municipal subcategorisation
+                cat_base = cat.replace('Sweden', '{}')
+                test_cat = self.municipal_subcategory(cat_base, cache)
+                if test_cat:
+                    self.needs_place_cat = False
+                    cat = test_cat
             elif self.land in country_map and tag_map[tag].get('base'):
                 test_cat = tag_map[tag].get('base').format(
                     country_map(self.land))
