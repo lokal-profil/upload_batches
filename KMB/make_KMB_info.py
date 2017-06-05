@@ -464,7 +464,7 @@ class KMBInfo(MakeBaseInfo):
         :param content_cats: any content categories for the file
         :return: list of categories (without "Category:" prefix)
         """
-        cats = item.meta_cats
+        cats = set([self.make_maintenance_cat(cat) for cat in item.meta_cats])
 
         # base cats
         # "Images from the Swedish National Heritage Board" already added by
@@ -584,18 +584,22 @@ class KMBItem(object):
 
         :return: str
         """
-        wiki_description = '{}.'.format(self.beskrivning.rstrip(' .'))
+        descr = self.beskrivning or ''
+        wiki_description = '{}.'.format(descr.rstrip(' .'))
         if (self.motiv != self.namn) and (self.motiv != self.beskrivning):
             wiki_description += '\n{} '.format(self.motiv)
 
         if self.avbildar:
-            wiki_description += ' '.join(self.avbildar)
+            wiki_description += '\n{}'.format(' '.join(self.avbildar))
 
         return wiki_description.strip()
 
     def get_original_description(self):
-        """Generate original description incl. keywords and class(es)."""
-        descr = self.beskrivning
+        """Get original description incl. motif, keywords and class(es)."""
+        descr = self.beskrivning or ''
+
+        if self.motiv:
+            descr += '\nMotiv: {}'.format(self.motiv)
 
         if self.item_keywords:
             descr += '\nNyckelord: {}'.format(', '.join(self.item_keywords))
@@ -603,9 +607,10 @@ class KMBItem(object):
         if self.item_classes:
             # Otput the primary class, if identified, else output all
             classes = self.isolate_primary_class() or self.item_classes
-            descr += '\Kategori: {}'.format(', '.join(common.listify(classes)))
+            descr += '\nKategori: {}'.format(
+                ', '.join(common.listify(classes)))
 
-        return descr
+        return descr.strip()
 
     # @todo: construct a fallback for descriptions,
     #        and ensure meta cats tie in to this
