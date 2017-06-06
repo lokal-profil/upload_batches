@@ -22,7 +22,7 @@ from batchupload.make_info import MakeBaseInfo
 
 MAPPINGS_DIR = 'mappings'
 BATCH_CAT = 'Media contributed by RAÄ'  # stem for maintenance categories
-BATCH_DATE = '2017-05'  # branch for this particular batch upload
+BATCH_DATE = '2017-06'  # branch for this particular batch upload
 LOGFILE = 'kmb_processing.log'
 
 
@@ -587,7 +587,7 @@ class KMBItem(object):
         descr = self.beskrivning or ''
         wiki_description = '{}.'.format(descr.rstrip(' .'))
         if (self.motiv != self.namn) and (self.motiv != self.beskrivning):
-            wiki_description += '\n{} '.format(self.motiv)
+            wiki_description += '\n{}. '.format(self.motiv.rstrip(' .'))
 
         if self.avbildar:
             wiki_description += '\n{}'.format(' '.join(self.avbildar))
@@ -599,16 +599,21 @@ class KMBItem(object):
         descr = self.beskrivning or ''
 
         if self.motiv:
-            descr += '\nMotiv: {}'.format(self.motiv)
+            descr += '<br>\n''Motiv'': {}'.format(self.motiv)
 
         if self.item_keywords:
-            descr += '\nNyckelord: {}'.format(', '.join(self.item_keywords))
+            descr += '<br>\n''Nyckelord'': {}'.format(
+                ', '.join(self.item_keywords))
 
         if self.item_classes:
-            # Otput the primary class, if identified, else output all
+            # Output the primary class, if identified, else output all
             classes = self.isolate_primary_class() or self.item_classes
-            descr += '\nKategori: {}'.format(
+            descr += '<br>\n''Kategori'': {}'.format(
                 ', '.join(common.listify(classes)))
+
+        descr = descr.strip()
+        if descr.startswith('<br>'):
+            descr = descr[len('<br>'):]
 
         return descr.strip()
 
