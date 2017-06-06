@@ -50,8 +50,6 @@ class KMBInfo(MakeBaseInfo):
         """
         return common.open_and_read_file(in_file, as_json=True)
 
-    # @todo: Not all problems should necessarily result in skipping the image
-    #        completely. And some other issues possibly should - T164578
     def process_data(self, raw_data):
         """
         Take the loaded data and construct a KMBItem for each.
@@ -355,7 +353,8 @@ class KMBInfo(MakeBaseInfo):
         :return: dict with found data
         """
         props = props or ('id', 'commonscat', 'wd_item')
-        data = data or {}
+        if data is None:
+            data = {}
         base_url = 'https://tools.wmflabs.org/heritage/api/api.php?action=search&format=json&srwithcommonscat=1'  # noqa E501
         url = '{0}&srcountry={1}&props={2}'.format(
             base_url, dataset, '|'.join(props))
