@@ -189,7 +189,11 @@ class KMBInfo(MakeBaseInfo):
         for k, v in data.iteritems():
             if v.get('commonscat'):
                 entry = {'wd': v.get('wd'), 'cat': v.get('commonscat')}
+
                 prefix, _, idno = k.rpartition('/')
+                if prefix.endswith('/html'):
+                    prefix = prefix[len('/html'):]
+
                 if prefix == 'raa/fmi/':
                     mapped_data['fmis'][idno] = entry
                 elif prefix in ('raa/bbra', 'raa/bbrb', 'raa/bbr', 'raa/bbrm'):
