@@ -194,7 +194,7 @@ class KMBInfo(MakeBaseInfo):
                 if prefix.endswith('/html'):
                     prefix = prefix[:-len('/html')]
 
-                if prefix == 'raa/fmi/':
+                if prefix == 'raa/fmi':
                     mapped_data['fmis'][idno] = entry
                 elif prefix in ('raa/bbra', 'raa/bbrb', 'raa/bbr', 'raa/bbrm'):
                     mapped_data['bbr'][idno] = entry
