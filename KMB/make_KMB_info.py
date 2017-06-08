@@ -734,7 +734,7 @@ class KMBItem(object):
         * item_classes: (human construct, building, castle) returns [castle]
         * item_classes: (human construct, building, church) returns []
         * item_classes: (building, castle, animal, chicken) returns
-            [runestone, chicken]
+            [castle, chicken]
 
         :return: the matching class
         """
