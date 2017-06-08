@@ -139,7 +139,7 @@ class KMBInfo(MakeBaseInfo):
         self.mappings['primary_classes'] = common.open_and_read_file(
             primary_classes_file, as_json=True)
 
-        python.output('Loaded all mappings')
+        pywikibot.output('Loaded all mappings')
 
     def get_photographer_mapping(self, photographer_page):
         """
