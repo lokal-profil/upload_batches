@@ -192,7 +192,7 @@ class KMBInfo(MakeBaseInfo):
 
                 prefix, _, idno = k.rpartition('/')
                 if prefix.endswith('/html'):
-                    prefix = prefix[len('/html'):]
+                    prefix = prefix[:-len('/html')]
 
                 if prefix == 'raa/fmi/':
                     mapped_data['fmis'][idno] = entry
