@@ -1,1 +1,0 @@
-git+https://github.com/lokal-profil/BatchUploadTools.git@0.1.5
