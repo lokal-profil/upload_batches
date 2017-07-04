@@ -26,8 +26,3 @@ precautions.
 * **`SMM-images`**: A batch upload of images from the National Maritime Museums 
   of Sweden. Metadata was delivered as a .csv file and connected to objects in
   KulturNav.
-* **`KMB`**: A batch upload of images from the National Heritage Board's
-  *Kulturmiljöbild*. A list of image ids to upload was provided by the
-  organisation and the metadata for these was pre-fetched using `kmb_massload.py`.
-  The code is based heavily on pre-existing code in
-  [lokal-profil/RAA-tools](https://github.com/lokal-profil/RAA-tools).
