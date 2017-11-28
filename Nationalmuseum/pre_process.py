@@ -7,15 +7,20 @@ Any unrecognized LIDO tags are flagged so that they can be processed later.
 
 run as python Batches/Nationalmuseum/pre_process.py
 """
+import argparse
+
 import batchupload.common as common  # temp before this is merged with helper
 import batchupload.prepUpload as prep
 import os
+import sys
 import pywikibot
 import xmltodict
 from collections import OrderedDict
 
-MAIN_DIR = u'Batches/Nationalmuseum/'
-XML_DIR = u'LIDO XML/valid_items_transform_1618/16-09-07_14_46_28/'
+MAIN_DIR = '.'
+XML_DIR = 'data/'
+
+REPOSITORY_VIAF = "http://viaf.org/viaf/147742988"
 
 
 def load_xml(filename):
@@ -36,37 +41,37 @@ def process_all_files(base_dir=MAIN_DIR, xml_dir=XML_DIR):
     """Identify all xml files in a directory, load the data and process."""
     # Check categories
     xml_dir = os.path.join(base_dir, xml_dir)
-    for directory in (base_dir, xml_dir):
-        if not os.path.isdir(directory):
+    for dr in (base_dir, xml_dir):
+        if not os.path.isdir(dr):
             raise common.MyError(
-                u'The provided directory was not a valid directory: %s'
-                % directory)
+                'The provided directory is not a valid directory: {}'.format(dr))
 
     # Find candidate files
     found_files = prep.find_files(
         path=xml_dir, file_exts=('.xml', ), subdir=False)
-    pywikibot.output("Found %d .xml files" % len(found_files))
-
+    pywikibot.output("Found {} .xml files".format(len(found_files)))
     data = {}
     for xml_file in found_files:
-        try:
-            test = InfoEntry(load_xml(xml_file))
-        except Exception as e:
-            pywikibot.output(
-                u"Encountered error while processing %s: %s" %
-                (os.path.split(xml_file)[-1], e))
-            continue
+        test = InfoEntry(load_xml(xml_file))
+        # try:
+        #     test = InfoEntry(load_xml(xml_file))
+        # except Exception as e:
+        #     message = os.path.split(xml_file)[-1]
+        #     pywikibot.output(
+        #         "Encountered error while processing {} : {}".format(message,
+        #                                                             e))
+        #     continue
         if test.obj_id in data.keys():
             pywikibot.output(
-                u"Multiple files for same object: %s, %s, %s" % (
+                "Multiple files for same object: %s, %s, %s" % (
                     test.obj_id, test.source_file,
                     data[test.obj_id]['source_file']))
             continue
         data[test.obj_id] = test.output()
 
-    out_file = os.path.join(base_dir, u'processed_lido.json')
+    out_file = os.path.join(base_dir, 'processed_lido_2.json')
     common.open_and_write_file(out_file, data, as_json=True)
-    pywikibot.output("Created %s with %d entries" % (out_file, len(data)))
+    pywikibot.output("Created {} with {} entries".format(out_file, len(data)))
 
 
 def get_lang_values_from_set(value_list, subtags=None):
@@ -86,7 +91,7 @@ def get_lang_values_from_set(value_list, subtags=None):
     for value_entry in value_list:
         if subtags:
             for tag in subtags:
-                if value_entry.keys() != [tag]:  # expect no other subtag
+                if list(value_entry.keys()) != [tag]:  # expect no other subtag
                     pywikibot.output(
                         "Found unexpected tags: %s"
                         % ', '.join(value_entry.keys()))
@@ -96,8 +101,7 @@ def get_lang_values_from_set(value_list, subtags=None):
         # skip empty entries
         if not value_entry:
             continue
-
-        if isinstance(value_entry, unicode):
+        if isinstance(value_entry, str):
             # some values are not language tagged
             result[unknown] = value_entry
         else:
@@ -122,13 +126,13 @@ def flag_missed_tags(data, level, handled, skipped):
 
 def handle_actor(actor):
     """Handle an entry on lido:actor level."""
-    unknowns = (u'Okänd', )
+    unknowns = ('Okänd', )
     result = {}
-    if actor[u'lido:actorID'][u'@lido:type'] == u'Nationalmuseum Sweden artist ID; NSID':
-        result['nsid'] = actor[u'lido:actorID'][u'#text']
+    if actor['lido:actorID']['@lido:type'] == 'Nationalmuseum Sweden artist ID; NSID':
+        result['nsid'] = actor['lido:actorID']['#text']
     else:
-        result['other_id'] = actor[u'lido:actorID'][u'#text']
-    name = actor[u'lido:nameActorSet'][u'lido:appellationValue']
+        result['other_id'] = actor['lido:actorID'][u'#text']
+    name = actor['lido:nameActorSet']['lido:appellationValue']
     if name in unknowns:
         name = None
     result['name'] = name
@@ -140,7 +144,7 @@ class InfoEntry(object):
 
     def __init__(self, xml_data, debug=False):
         """Construct an info object from the loaded xml data."""
-        # definie any internals
+        # define any internals
         self.source_file = xml_data['source_file']
         self.raw_data = xml_data
         self.debug = debug
@@ -149,7 +153,7 @@ class InfoEntry(object):
         self._debug(self.source_file)
 
         # populate data
-        self.process_lido_xml(xml_data[u'lido:lidoWrap']['lido:lido'])
+        self.process_lido_xml(xml_data['lido:lidoWrap']['lido:lido'])
 
     def _debug(self, text):
         """Output if debug flag is set."""
@@ -177,160 +181,163 @@ class InfoEntry(object):
     def process_lido_xml(self, data):
         """Populate entry data given the loaded xml at lido:lido level."""
         handled_tags = list()
-        skipped_tags = [u'lido:lidoRecID', ]
+        skipped_tags = ['lido:lidoRecID', ]
 
         # add inv_nr
-        handled_tags.append(u'lido:objectPublishedID')
-        for publihed_id in data[u'lido:objectPublishedID']:
-            if publihed_id[u'@lido:type'] == u'local':
-                self.inv_nr = publihed_id[u'#text']
+        handled_tags.append('lido:repositoryWrap')
 
-        # handle administrative metadata
-        handled_tags.append(u'lido:administrativeMetadata')
-        self.add_admin_data(data[u'lido:administrativeMetadata'])
+        handled_tags.append('lido:administrativeMetadata')
+        self.add_admin_data(data['lido:administrativeMetadata'])
 
-        # handle descriptive metadata
+        # # handle descriptive metadata
         handled_tags.append(u'lido:descriptiveMetadata')
         self.add_descriptive_data(data[u'lido:descriptiveMetadata'])
 
-        flag_missed_tags(data, '', handled_tags, skipped_tags)
+        # flag_missed_tags(data, '', handled_tags, skipped_tags)
 
     def add_admin_data(self, data):
         handled_tags = list()
-        skipped_tags = [u'lido:rightsWorkWrap', u'@xml:lang']
-        tag = u'lido:administrativeMetadata'
+        skipped_tags = ['lido:rightsWorkWrap', '@xml:lang']
+        tag = 'lido:administrativeMetadata'
 
         # set obj_id
-        handled_tags.append(u'lido:recordWrap')
-        recordID = data[u'lido:recordWrap'][u'lido:recordID']
-        if recordID['@lido:type'] == 'local':
-            self.obj_id = recordID['#text']
+        handled_tags.append('lido:recordWrap')
+        recordID = data['lido:recordWrap']['lido:recordID']
+        self.obj_id = recordID['#text']
 
-        # add image data
-        handled_tags.append(u'lido:resourceWrap')
-        self.add_image_data(data[u'lido:resourceWrap'][u'lido:resourceSet'])
+        # # add image data
+        handled_tags.append('lido:resourceWrap')
+        self.add_image_data(data['lido:resourceWrap']['lido:resourceSet'])
 
-        flag_missed_tags(data, tag, handled_tags, skipped_tags)
+        # flag_missed_tags(data, tag, handled_tags, skipped_tags)
 
     def add_image_data(self, data):
         handled_tags = list()
         skipped_tags = ['', ]
-        tag = u'lido:resourceWrap/lido:resourceSet'
+        tag = 'lido:resourceWrap/lido:resourceSet'
 
         # identify filenames
-        handled_tags.append(u'lido:resourceRepresentation')
+        handled_tags.append('lido:resourceRepresentation')
         self.images = {}
         images = []
         # identify local images
-        links = data[u'lido:resourceRepresentation']
+        links = data['lido:resourceRepresentation']
         for link in links:
-            if link[u'lido:linkResource'].startswith('http'):
+            if isinstance(link['lido:linkResource'], str) and link['lido:linkResource'].startswith('http'):
                 continue
-            images.append(link[u'lido:linkResource'])
+            if link['lido:linkResource'].get('@lido:formatResource'):
+                if link['lido:linkResource']['@lido:formatResource'] == "tiff" or link['lido:linkResource']['@lido:formatResource'] == "tif":
+                    filename = link['lido:linkResource']['#text']
+                    images.append(filename)
 
         # match image to attributions
-        handled_tags.append(u'lido:rightsResource')
+        handled_tags.append('lido:rightsResource')
         attributions = common.listify(
-            data[u'lido:rightsResource'].get(u'lido:rightsHolder'))
+            data['lido:rightsResource'].get('lido:rightsHolder'))
         if attributions:
             if len(attributions) != len(images):
                 pywikibot.warning(
                     "image-attribution missmatch in %s" % self.source_file)
             for i, attribution in enumerate(attributions):
-                self.images[images[i]] = attribution[u'lido:legalBodyName'][u'lido:appellationValue']
-            #nån logik som ser till att det inte blir fel ibland
+                self.images[images[i]] = attribution[
+                    'lido:legalBodyName']['lido:appellationValue']
+            # nån logik som ser till att det inte blir fel ibland
         else:
             # there aren't always photographers
             for i, image in enumerate(images):
                 self.images[images[i]] = None
 
         # add license, just in case
-        self.image_license = data[u'lido:rightsResource'][u'lido:rightsType'][u'lido:term']['#text']
+        self.image_license = data['lido:rightsResource'][
+            'lido:rightsType']['lido:term']['#text']
 
-        flag_missed_tags(data, tag, handled_tags, skipped_tags)
+        # flag_missed_tags(data, tag, handled_tags, skipped_tags)
 
     def add_descriptive_data(self, data):
         handled_tags = list()
-        skipped_tags = ['lido:objectClassificationWrap', u'@xml:lang']
-        tag = u'lido:descriptiveMetadata'
+        skipped_tags = ['lido:objectClassificationWrap', '@xml:lang']
+        tag = 'lido:descriptiveMetadata'
 
         # add identification data
-        handled_tags.append(u'lido:objectIdentificationWrap')
-        self.add_identification_data(data[u'lido:objectIdentificationWrap'])
+        handled_tags.append('lido:objectIdentificationWrap')
+        self.add_identification_data(data['lido:objectIdentificationWrap'])
 
         # add event data
-        handled_tags.append(u'lido:eventWrap')
+        handled_tags.append('lido:eventWrap')
         self.add_event_data(
-            common.listify(data[u'lido:eventWrap']['lido:eventSet']))
+            common.listify(data['lido:eventWrap']['lido:eventSet']))
 
         # add relation data
-        handled_tags.append(u'lido:objectRelationWrap')
-        self.add_relation_data(data[u'lido:objectRelationWrap'])
+        handled_tags.append('lido:objectRelationWrap')
+        self.add_relation_data(data['lido:objectRelationWrap'])
 
-        flag_missed_tags(data, tag, handled_tags, skipped_tags)
+        # flag_missed_tags(data, tag, handled_tags, skipped_tags)
 
     def add_identification_data(self, data):
         handled_tags = list()
         skipped_tags = ['', ]
-        tag = u'lido:objectIdentificationWrap'
+        tag = 'lido:objectIdentificationWrap'
 
         # add title
-        handled_tags.append(u'lido:titleWrap')
-        titles = common.listify(data[u'lido:titleWrap'][u'lido:titleSet'])
+        handled_tags.append('lido:titleWrap')
+        titles = common.listify(data['lido:titleWrap']['lido:titleSet'])
         self.titles = get_lang_values_from_set(
-            titles, (u'lido:appellationValue', ))
+            titles, ('lido:appellationValue', ))
 
         # add incription
-        handled_tags.append(u'lido:inscriptionsWrap')
+        handled_tags.append('lido:inscriptionsWrap')
         inscriptions = common.listify(
-            data[u'lido:inscriptionsWrap'][u'lido:inscriptions'])
+            data['lido:inscriptionsWrap']['lido:inscriptions'])
         self.inscriptions = get_lang_values_from_set(
-            inscriptions, (u'lido:inscriptionTranscription', ))
+            inscriptions, ('lido:inscriptionTranscription', ))
 
         # add decription
-        handled_tags.append(u'lido:objectDescriptionWrap')
-        description_set = data[u'lido:objectDescriptionWrap'][u'lido:objectDescriptionSet']
+        handled_tags.append('lido:objectDescriptionWrap')
+        description_set = data['lido:objectDescriptionWrap'][
+            'lido:objectDescriptionSet']
         if not isinstance(description_set, OrderedDict):
             pywikibot.warning(
-                "Weird things are happening in description field for %s:\n%s"
-                % (self.source_file, description_set))
+                "Weird things are happening in description field for {}:\n{}".format(self.source_file, description_set))
         descriptions = common.listify(
-            description_set[u'lido:descriptiveNoteValue'])
+            description_set['lido:descriptiveNoteValue'])
         self.descriptions = get_lang_values_from_set(descriptions)
 
         # add measurements
-        handled_tags.append(u'lido:objectMeasurementsWrap')
-        measurement_set = data[u'lido:objectMeasurementsWrap'][u'lido:objectMeasurementsSet']
-        if set(measurement_set.keys()) - set([u'lido:displayObjectMeasurements', u'lido:objectMeasurements']):
+        handled_tags.append('lido:objectMeasurementsWrap')
+        measurement_set = data['lido:objectMeasurementsWrap'][
+            'lido:objectMeasurementsSet']
+        if set(measurement_set.keys()) - set(['lido:displayObjectMeasurements', 'lido:objectMeasurements']):
             pywikibot.warning(
-                "Weird things are happening in measurement field for %s:\n%s"
-                % (self.source_file, measurement_set))
-        self._debug(measurement_set.get(u'lido:displayObjectMeasurements'))
+                "Weird things are happening in measurement field for {}:\n{}".format(self.source_file, measurement_set))
+        self._debug(measurement_set.get('lido:displayObjectMeasurements'))
         measurements = common.trim_list(common.listify(
-            measurement_set.get(u'lido:displayObjectMeasurements')))
+            measurement_set.get('lido:displayObjectMeasurements')))
         self._debug(measurements)
-        self.add_meaurements(measurements)
+        self.add_measurements(measurements)
 
         # ensure location is always Nationalmuesum
-        handled_tags.append(u'lido:repositoryWrap')
-        repository_viaf = data[u'lido:repositoryWrap']['lido:repositorySet']['lido:repositoryName']['lido:legalBodyID']['#text']
-        if repository_viaf != u'http://viaf.org/viaf/147742988':
-            pywikibot.warning(
-                "Unexpected repoitory in %s: %s"
-                % (self.source_file, repository_viaf))
+        handled_tags.append('lido:repositoryWrap')
+        rep_sets = data['lido:repositoryWrap']['lido:repositorySet']
+        for rep in rep_sets:
+            if rep.get('lido:workID'): # set inventarienummer
+                self.inv_nr = rep['lido:workID']['#text']
+            if rep.get('@lido:type') and rep['@lido:type'] == "current":
+                viaf = rep["lido:repositoryName"]["lido:legalBodyID"]["#text"]
+                if viaf != REPOSITORY_VIAF:
+                    pywikibot.warning(
+                        "Unexpected repository in {} : {}".format(self.source_file, repository_viaf))
+        # flag_missed_tags(data, tag, handled_tags, skipped_tags)
 
-        flag_missed_tags(data, tag, handled_tags, skipped_tags)
-
-    def add_meaurements(self, measurements):
+    def add_measurements(self, measurements):
         recognised_units = ('cm', 'mm')
         recognied_prefixes = {
-            u'_': u'_',
-            u'Mått': u'_',
-            u'Ram': u'Framed',
+            '_': '_',
+            'Mått': '_',
+            'Ram': 'Framed',
         }
         skipped_prefixes = (
-            u'Vikt', u'Trpram', u'Spännram', u'Montering', u'Yttermått',
-            u'Rymd', u'Passepartout')
+            'Vikt', 'Trpram', 'Spännram', 'Montering', 'Yttermått',
+            'Rymd', 'Passepartout')
         self.measurements = {}
         if not measurements:
             return
@@ -345,13 +352,11 @@ class InfoEntry(object):
             if parts[0] not in recognied_prefixes.keys():
                 if parts[0] not in skipped_prefixes:
                     pywikibot.warning(
-                        "Unrecognized prefix in measurement for %s:\n%s"
-                        % (self.source_file, measurement))
+                        "Unrecognized prefix in measurement for {} : \n{}".format(self.source_file, measurement))
                 continue
             if parts[0] in self.measurements.keys():
                 pywikibot.warning(
-                    "Reused prefix in measurement for %s:\n%s"
-                    % (self.source_file, measurement))
+                    "Reused prefix in measurement for {} :\n{}".format(self.source_file, measurement))
                 continue
 
             # handle units
@@ -393,6 +398,7 @@ class InfoEntry(object):
                     self.measurements[key]['depth'] = values[2]
 
     def add_event_data(self, events):
+        # print("adding event data")
         creation_concept = 'http://terminology.lido-schema.org/lido00012'
         recognised_concepts = {
             'creation': creation_concept,
@@ -401,7 +407,8 @@ class InfoEntry(object):
 
         found_creation = False
         for event in events:
-            concept = event[u'lido:event'][u'lido:eventType']['lido:conceptID'][u'#text']
+            concept = event['lido:event'][
+                'lido:eventType']['lido:conceptID']['#text']
             if concept not in recognised_concepts.values():
                 pywikibot.warning(
                     "Unrecognized event concept for %s: %s"
@@ -411,7 +418,7 @@ class InfoEntry(object):
                     pywikibot.warning(
                         "Multiple creation events for %s" % self.source_file)
                 found_creation = True
-                self.add_creation(event[u'lido:event'])
+                self.add_creation(event['lido:event'])
 
         if not found_creation:
             pywikibot.warning(
@@ -419,90 +426,118 @@ class InfoEntry(object):
 
     def add_creation(self, event):
         handled_tags = list()
-        skipped_tags = ['lido:eventName', u'lido:eventType']
-        tag = u'lido:event'
+        skipped_tags = ['lido:eventName', 'lido:eventType']
+        tag = 'lido:event'
+        # print("adding creation....")
 
         # add creator(s)
-        handled_tags.append(u'lido:eventActor')
+        handled_tags.append('lido:eventActor')
         self.creator = {}
         self.handle_creators(
-            common.trim_list(common.listify(event[u'lido:eventActor'])))
+            common.trim_list(common.listify(event['lido:eventActor'])))
+        # print(self.creator)
+
 
         # add creation_date
-        handled_tags.append(u'lido:eventDate')
+        # print("adding creation date")
+        handled_tags.append('lido:eventDate')
         self.creation_date = {}
-        if event.get(u'lido:eventDate'):
-            self.creation_date['earliest'] = event[u'lido:eventDate'][u'lido:date'].get(u'lido:earliestDate')
-            self.creation_date['latest'] = event[u'lido:eventDate'][u'lido:date'].get(u'lido:latestDate')
-            self.creation_date['text'] = get_lang_values_from_set(
-                common.listify(event[u'lido:eventDate'][u'lido:displayDate']))
+        if event.get('lido:eventDate'):
+            try:
+                self.creation_date['earliest'] = event['lido:eventDate'][
+                    'lido:date'].get('lido:earliestDate')
+                self.creation_date['latest'] = event['lido:eventDate'][
+                    'lido:date'].get('lido:latestDate')
+                self.creation_date['text'] = get_lang_values_from_set(
+                    common.listify(event['lido:eventDate']['lido:displayDate']))
+            except TypeError:
+                print("")
+
+        # print("added creation date")
 
         # add creation place
-        handled_tags.append(u'lido:eventPlace')
-        self.creation_place = get_lang_values_from_set(
-            common.listify(
-                event[u'lido:eventPlace'][u'lido:place'][u'lido:namePlaceSet']),
-            (u'lido:appellationValue', ))
+        handled_tags.append('lido:eventPlace')
+        try:
+            self.creation_place = get_lang_values_from_set(
+                common.listify(
+                    event['lido:eventPlace']['lido:place']['lido:namePlaceSet']),
+                ('lido:appellationValue', ))
+        except:
+            self.creation_place = ""
+
+        # print("added creation place")
 
         # add materialtech
-        handled_tags.append(u'lido:eventMaterialsTech')
+        handled_tags.append('lido:eventMaterialsTech')
         self.techniques = get_lang_values_from_set(
-            common.listify(event[u'lido:eventMaterialsTech']),
-            (u'lido:materialsTech', u'lido:termMaterialsTech', u'lido:term'))
+            common.listify(event['lido:eventMaterialsTech']),
+            ('lido:materialsTech', 'lido:termMaterialsTech', 'lido:term'))
 
         flag_missed_tags(event, tag, handled_tags, skipped_tags)
 
     def handle_creators(self, actors):
-        creator_roles = (u'Konstnär', u'Utförd av', u'Komp. och utförd av')
+        # print("handling creators")
+        creator_roles = ('Konstnär', 'Utförd av', 'Komp. och utförd av')
         skipped_roles = (
-            u'Tidigare attribution', u'Medarbetare',
-            u'Alternativ tillskrivning', u'Beställare')
-        qualified_roles = (u'Attribuerad till', u'Kopia efter', u'Fri kopia efter', u'Efter')
+            'Tidigare attribution', 'Medarbetare',
+            'Alternativ tillskrivning', 'Beställare')
+        qualified_roles = ('Attribuerad till', 'Kopia efter',
+                           'Fri kopia efter', 'Efter')
         all_roles = (creator_roles + skipped_roles + qualified_roles)
         qualifiers = {
-            u'Tillskriven': 'P1773',
-            u'Attribuerad till': 'P1773',
-            u'Hennes ateljé': 'P1774',
-            u'Hans ateljé': 'P1774',
-            u'Hennes skola': 'P1780',
-            u'Hans skola': 'P1780',
-            u'Hennes art': 'P1777',
-            u'Hans art': 'P1777',
-            u'Kopia efter': 'P1877',
-            u'Fri kopia efter': 'P1877',
-            u'Efter': 'P1877',
-            u'Osäker attribution': None,
-            u'Alternativ attribution': None,
+            'Tillskriven': 'P1773',
+            'Attribuerad till': 'P1773',
+            'Hennes ateljé': 'P1774',
+            'Hans ateljé': 'P1774',
+            'Hennes skola': 'P1780',
+            'Hans skola': 'P1780',
+            'Hennes art': 'P1777',
+            'Hans art': 'P1777',
+            'Kopia efter': 'P1877',
+            'Fri kopia efter': 'P1877',
+            'Efter': 'P1877',
+            'Osäker attribution': None,
+            'Alternativ attribution': None,
         }
 
         for actor in actors:
-            if actor.keys() != [u'lido:actorInRole', ]:
+            if list(actor.keys()) != ['lido:actorInRole', ]:
                 pywikibot.warning(
-                    "Unexpected actor tag for %s:\n%s"
-                    % (self.source_file, actor))
+                    "Unexpected actor tag for {}:\n{}".format(self.source_file,
+                                                              actor))
                 continue
 
+
             # check role
-            actor_role = actor[u'lido:actorInRole'][u'lido:roleActor'][u'lido:term'].get(u'#text')
+            actor_role = actor['lido:actorInRole'][
+                'lido:roleActor']['lido:term'].get('#text')
+
             if not actor_role:
                 continue  # empty entry
             elif actor_role not in all_roles:
+                warn_cont = actor['lido:actorInRole']['lido:roleActor']
                 pywikibot.warning(
-                    "Unexpected actor role for %s:\n%s"
-                    % (self.source_file, actor[u'lido:actorInRole'][u'lido:roleActor']))
+                    "Unexpected actor role for {} :\n{}".format(self.source_file,
+                                                         warn_cont))
                 continue
             elif actor_role in skipped_roles:
                 continue
 
+
+
             # check qualifier
-            qualifier = actor[u'lido:actorInRole'].get(u'lido:attributionQualifierActor')
+            qualifier = actor['lido:actorInRole'].get(
+                    'lido:attributionQualifierActor')
             if qualifier and qualifier not in qualifiers:
                 pywikibot.warning(
-                    "Unhandled actor qualifier for %s:\n%s"
-                    % (self.source_file, qualifier))
+                    "Unhandled actor qualifier for {}:\n{}".format(self.source_file,
+                                                                   qualifier))
                 continue
 
-            actor_info = handle_actor(actor[u'lido:actorInRole'][u'lido:actor'])
+
+            actor_info = handle_actor(
+                actor['lido:actorInRole']['lido:actor'])
+
 
             # handle any direct or inidrect qualifies
             if actor_role in qualified_roles:
@@ -511,7 +546,10 @@ class InfoEntry(object):
                 actor_info['qualifier'] = qualifiers[qualifier]
 
             # crash if no nsid
-            self.creator[actor_info['nsid']] = actor_info
+            nsid = actor_info['nsid']
+            self.creator[nsid] = actor_info
+            # print(self.creator)
+            # print("added creator!!!!!!!!!!!!!!!!!!")
 
     def add_relation_data(self, data):
         handled_tags = list()
@@ -521,7 +559,8 @@ class InfoEntry(object):
         # handle subjects
         handled_tags.append(u'lido:subjectWrap')
         self.subjects = list()
-        subjects = data[u'lido:subjectWrap'][u'lido:subjectSet'][u'lido:subject']
+        subjects = data[u'lido:subjectWrap'][
+            u'lido:subjectSet'][u'lido:subject']
         if subjects:
             subjects = common.listify(subjects[u'lido:subjectActor'])
             for subject in subjects:
@@ -531,17 +570,12 @@ class InfoEntry(object):
         flag_missed_tags(data, tag, handled_tags, skipped_tags)
 
 
-def test():
-    """Temporary entry point for tests."""
-    xml_dir = os.path.join(MAIN_DIR, XML_DIR)
-    filenames = [
-        u'Item_7012482.xml', u'Item_7015842.xml', u'Item_7015788.xml', u'Item_7015002.xml', u'Item_7016287.xml', u'Item_7016251.xml', u'Item_7016257.xml', u'Item_7012945.xml'
-    ]
-    for filename in filenames:
-        data = load_xml(os.path.join(xml_dir, filename))
-        test = InfoEntry(data, debug=True)
-        print test.source_file, test.obj_id
+def main(args):
+    process_all_files(xml_dir=args.datadir)
 
-if __name__ == "__main__":
-    process_all_files()
-    #test()
+
+if __name__ == '__main__':
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--datadir", default="test_data")
+    args = parser.parse_args()
+    main(args)

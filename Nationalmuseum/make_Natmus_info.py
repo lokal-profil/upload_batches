@@ -16,7 +16,7 @@ import pywikibot.data.sparql as sparql
 
 OUT_PATH = u'connections'
 BATCH_CAT = u'Media contributed by Nationalmuseum Stockholm‎'
-BATCH_DATE = u'2016-10'
+BATCH_DATE = u'2017-11'
 BASE_NAME = u'artwork'
 COLLECTION = u'Nationalmuseum'
 LANGUAGE_PRIORITY = ('_', 'en', 'sv')
@@ -47,7 +47,7 @@ class NatmusInfo(MakeBaseInfo):
         # log file to handle skipped files
         self.logger = []
 
-        super(NatmusInfo, self).__init__(BATCH_CAT, BATCH_DATE)
+        super(NatmusInfo, self).__init__(BATCH_CAT, BATCH_DATE, **options)
 
     def log(self, text):
         """
@@ -61,24 +61,33 @@ class NatmusInfo(MakeBaseInfo):
     def load_place_mappings():
         """Mappings between known placees and wikidata."""
         return {
-            u'Moskva': 'Q649',
-            u'Kina': 'Q29520',
-            u'Leiden': 'Q43631',
-            u'Frankrike': 'Q142',
-            u'Haarlem': 'Q9920',
-            u'Danmark': 'Q35',
-            u'München': 'Q1726',
-            u'Paris': 'Q90',
-            u'Italien': 'Q38',
-            u'England': 'Q21',
-            u'Sverige': 'Q34',
-            u'Stockholm': 'Q1754',
-            u'Jämtland': 'Q211661',
-            u'Fontainebleau': 'Q182872',
-            u'Florens': 'Q2044',
-            u'Nederländerna': 'Q55',
-            u'Rom': 'Q220',
-            u'Antwerpen': 'Q12892',
+            'Antwerpen': 'Q12892',
+            'Danmark': 'Q35',
+            'England': 'Q21',
+            'Etiopien': 'Q115',
+            'Florens': 'Q2044',
+            'Fontainebleau': 'Q182872',
+            'Frankrike': 'Q142',
+            'Haarlem': 'Q9920',
+            'Indien': 'Q668',
+            'Irland': 'Q27',
+            'Italien': 'Q38',
+            'Jämtland': 'Q211661',
+            'Kina': 'Q29520',
+            'Leiden': 'Q43631',
+            'Moskva': 'Q649',
+            'München': 'Q1726',
+            'Nederländerna': 'Q55',
+            'Palermo': 'Q2656',
+            'Paris': 'Q90',
+            'Prag': 'Q41876',
+            'Reims': 'Q41876',
+            'Rom': 'Q220',
+            'Stockholm': 'Q1754',
+            'Storbritannien': 'Q145',
+            'Sverige': 'Q34',
+            'Tyskland': 'Q183',
+            'Utrecht': 'Q39297398',
         }
 
     @staticmethod
@@ -132,7 +141,7 @@ class NatmusInfo(MakeBaseInfo):
         for d in data:
             k = d[key].replace(entity_url, '')
             new_data[k] = {}
-            for kk, value in d.iteritems():
+            for kk, value in d.items():
                 value = value.split('|')
                 for i, v in enumerate(value):
                     value[i] = v.replace(entity_url, '')
@@ -184,6 +193,7 @@ WHERE
 }
 group by ?item ?obj_id
 '''
+        pywikibot.output("Loading paintings from Wikidata...")
         s = sparql.SparqlQuery()
         data = s.select(query)
         pywikibot.output("Loaded %d paintings from wikidata" % len(data))
@@ -214,6 +224,7 @@ WHERE
 }
 group by ?item ?itemLabel ?nsid
 '''
+        pywikibot.output("Querying creators from Wikidata...")
         s = sparql.SparqlQuery()
         data = s.select(query)
         pywikibot.output("Loaded %d artists from wikidata" % len(data))
@@ -275,7 +286,8 @@ SELECT ?item ?commons_cat WHERE {
             local_nsid_mapping.values())
 
         # store data in uri_ids
-        for k, v in local_nsid_mapping.iteritems():
+        for k, v in local_nsid_mapping.items():
+            self.uri_ids[k] = {}
             self.uri_ids[k]['mapped'] = v
             if v in local_cats.keys():
                 self.uri_ids[k]['cat'] = local_cats[v].get('commons_cat')
@@ -288,7 +300,7 @@ SELECT ?item ?commons_cat WHERE {
         """
         lido_data, image_files = raw_data
         d = {}
-        for key, value in lido_data.iteritems():
+        for key, value in lido_data.items():
             potential_images = value['images'].keys()
             matches = set(potential_images) & set(image_files)
             if not potential_images:
@@ -339,6 +351,8 @@ SELECT ?item ?commons_cat WHERE {
             qid = self.place_mappings.get(p)
             if qid:
                 city_links.append(u'{{city|%s}}' % qid)
+            else:
+                print(p)
 
         return ', '.join(city_links)
 
@@ -380,7 +394,7 @@ SELECT ?item ?commons_cat WHERE {
             return {
                 'link': wd_artist.get('item')[0],
                 'name': name
-                }
+            }
         else:
             # log as missing in wikidata
             if 'wd' not in self.uri_ids[other_id].keys():
@@ -400,7 +414,7 @@ SELECT ?item ?commons_cat WHERE {
                 return {
                     'link': wd_painting_depicted[0],
                     'name': name
-                    }
+                }
             elif self.uri_ids[nsid].get('mapped'):
                 # locally mapped to a wikidata entry
                 if self.uri_ids[nsid].get('cat'):
@@ -410,8 +424,10 @@ SELECT ?item ?commons_cat WHERE {
                 return {
                     'link': self.uri_ids[nsid].get('mapped'),
                     'name': name
-                    }
+                }
             else:
+                dep_string = "{} - {}".format(nsid, name)
+                # print(dep_str)
                 if len(wd_painting_depicted) >= 1:
                     # log cases where we are potentially not using data
                     self.log(
@@ -424,7 +440,7 @@ SELECT ?item ?commons_cat WHERE {
                 item.add_to_tracker('issues', 'unlinked depicted')
                 return {
                     'name': name
-                    }
+                }
 
     @staticmethod
     def format_depicted_name(depicted_data):
@@ -468,7 +484,7 @@ SELECT ?item ?commons_cat WHERE {
                         NatmusInfo.format_depicted_name({
                             'link': qid,
                             'name': qid
-                            }))
+                        }))
             else:
                 return ''
 
@@ -509,13 +525,19 @@ SELECT ?item ?commons_cat WHERE {
         @return: int or None
         """
         # internal markup for unknown or something weird
-        unknown = (u't329875228', u't318787658', u't329488873', u't318035461')
+        unknown = ['t668887686',
+                   't663479158', 't329875228',
+                   't318787658', 't329488873',
+                   't318035461']
         deathyears = []
 
         # via wikidata for item
         wd_painting = self.wd_paintings.get(item.get_obj_id())
         if wd_painting and wd_painting.get('death_dates'):
             deathyears += wd_painting.get('death_dates')
+            # print(wd_painting)
+            # print("painting death dates_:")
+            # print(wd_painting.get('death_dates'))
 
         # via wikidata for knwon lido artist
         lido_artists = item.get_artists()
@@ -523,17 +545,21 @@ SELECT ?item ?commons_cat WHERE {
             wd_artist = self.wd_creators.get(nsid)
             if wd_artist and wd_artist.get('death_dates'):
                 deathyears += wd_artist.get('death_dates')
+                # print(wd_artist)
+                # print("artist death dates:")
+                # print(wd_artist.get('death_dates'))
 
         # remove dupes and unknowns
         deathyears = list(set(deathyears) - set(unknown))
 
         # identify the largest
-        year = None
+        year = 0
         for deathyear in deathyears:
             if not common.is_pos_int(deathyear[:4]):
                 pywikibot.error("Found non-integer deathyear: %s" % deathyear)
+            # print(deathyear)
             deathyear = int(deathyear[:4])
-            if deathyear > year:  # works as any int > None
+            if deathyear > year:  # works as any int > None # not in py3
                 year = deathyear
 
         return year
@@ -625,13 +651,13 @@ SELECT ?item ?commons_cat WHERE {
                     'template': creator_templates[0],
                     'link': qid,
                     'qualifier': qualifier
-                    }
+                }
             else:
                 return {
                     'link': qid,
                     'name': name,
                     'qualifier': qualifier
-                    }
+                }
         else:
             # log as missing in wikidata
             if 'wd' not in self.nsid[nsid].keys():
@@ -658,13 +684,13 @@ SELECT ?item ?commons_cat WHERE {
                         'template': creator_templates[0],
                         'link': wd_painting_artists[0],
                         'qualifier': qualifier
-                        }
+                    }
                 else:
                     return {
                         'link': wd_painting_artists[0],
                         'name': name,
                         'qualifier': qualifier
-                        }
+                    }
             else:
                 if len(wd_painting_artists) >= 1:
                     # log cases where we are potentially not using data
@@ -679,7 +705,7 @@ SELECT ?item ?commons_cat WHERE {
                 return {
                     'name': name,
                     'qualifier': qualifier
-                    }
+                }
 
     @staticmethod
     def format_artist_name(artist_data):
@@ -711,7 +737,7 @@ SELECT ?item ?commons_cat WHERE {
 
         wd_painting_artists = self.get_wd_painting_artists(item)
         lido_artists = item.get_artists()
-        for nsid, artist_data in lido_artists.iteritems():
+        for nsid, artist_data in lido_artists.items():
             artists.append(
                 self.get_single_artist(
                     nsid, artist_data, len(lido_artists),
@@ -732,7 +758,8 @@ SELECT ?item ?commons_cat WHERE {
             else:
                 # multiple named artists, just ignore any anons
                 formatted_artists = \
-                    [NatmusInfo.format_artist_name(artist) for artist in non_anons]
+                    [NatmusInfo.format_artist_name(
+                        artist) for artist in non_anons]
                 return '\n '.join(formatted_artists)
 
     @staticmethod
@@ -863,13 +890,13 @@ SELECT ?item ?commons_cat WHERE {
             cats.append(sub_collection['cat'])
 
         if not content_cats:
-            cats.append(self.make_maintanance_cat(u'improve categories'))
+            cats.append(self.make_maintenance_cat(u'improve categories'))
 
         while True:
             issue = item.get_from_tracker('issues')
             if not issue:
                 break
-            cats.append(self.make_maintanance_cat(issue_mapping[issue]))
+            cats.append(self.make_maintenance_cat(issue_mapping[issue]))
 
         cats = list(set(cats))  # remove any duplicates
         return cats
@@ -877,27 +904,6 @@ SELECT ?item ?commons_cat WHERE {
     def get_original_filename(self, item):
         """Return the original image filename without file extension."""
         return os.path.splitext(item.image)[0]
-
-    def run(self, in_file, base_name=None):
-        """Overload run to add log outputting."""
-        super(NatmusInfo, self).run(in_file, base_name)
-
-        # add/output connection logs
-        self.log(u'--------------------------------------------------nsid---')
-        for k, v in self.nsid.iteritems():
-            if v.get('wd'):
-                self.log(u'%s: %s' % (k, v))
-        self.log(u'------------------------------------------------uri_ids---')
-        for k, v in self.uri_ids.iteritems():
-            if v.get('wd') and not v.get('mapped'):
-                self.log(u'%s: %s' % (k, v))
-            elif not v.get('wd') and not v.get('mapped') and v.get('freq') > 5:
-                self.log(u'%s: %s' % (k, v))
-
-        if base_name:
-            logfile = u'%s.log' % base_name
-            common.open_and_write_file(logfile, '\n'.join(self.logger))
-            pywikibot.output("Created %s" % logfile)
 
     @staticmethod
     def handle_args(args):
@@ -915,7 +921,8 @@ SELECT ?item ?commons_cat WHERE {
             'in_file': None,
             'base_name': None,
             'skip_non_wikidata': False,
-            'nsid_file': None
+            'nsid_file': None,
+            'update_mappings': True
         }
         natmus_options = {
             'lido_file': None,
@@ -935,6 +942,8 @@ SELECT ?item ?commons_cat WHERE {
                     helpers.convertFromCommandline(value)
             elif option == '-skip_non_wikidata':
                 options['skip_non_wikidata'] = True
+            elif option == '-update_mappings':
+                options['update_mappings'] = True
 
         if natmus_options['lido_file'] and natmus_options['image_files']:
             options['in_file'] = \
@@ -944,22 +953,6 @@ SELECT ?item ?commons_cat WHERE {
                 BASE_NAME)
 
         return options
-
-    @classmethod
-    def main(cls, *args):
-        """Command line entry-point."""
-        usage = \
-            u'Usage:' \
-            u'\tpython Batches/Nationalmuseum/make_Natmus_info.py -lido_file:PATH -image_files:PATH -nsid_file:PATH -dir:PATH\n' \
-            u'\t-lido_file:PATH path to lido metadata file\n' \
-            u'\t-image_files:PATH path to image filenames file\n' \
-            u'\t-nsid_file:PATH path to local json with nsid mappings\n' \
-            u'\t-skip_non_wikidata to skip images without a wikidata entry\n' \
-            u'\t-dir:PATH specifies the path to the directory containing a ' \
-            u'user_config.py file (optional)\n' \
-            u'\tExample:\n' \
-            u'\tpython make_info.py -in_file:SMM/metadata.csv -dir:SMM\n'
-        super(NatmusInfo, cls).main(usage=usage, *args)
 
 
 class NatmusItem(object):
@@ -971,7 +964,7 @@ class NatmusItem(object):
 
         @param initial_data: dict of data to set up item with
         """
-        for key, value in initial_data.iteritems():
+        for key, value in initial_data.items():
             setattr(self, key, value)
 
         # a tracker of anything needed for categorization
@@ -1086,7 +1079,7 @@ class NatmusItem(object):
         * Not qualified or qualified with P1773
         """
         named_creators = []
-        for k, v in self.creator.iteritems():
+        for k, v in self.creator.items():
             if not v.get('name'):
                 continue
             if 'qualifier' not in v.keys() or v.get('qualifier') == 'P1773':
@@ -1104,7 +1097,7 @@ class NatmusItem(object):
         @return: str
         """
         # determine title
-        title = None
+        title = ""
         for lang in LANGUAGE_PRIORITY:
             if lang in self.title.keys():
                 title = self.title[lang]
@@ -1153,7 +1146,7 @@ class NatmusItem(object):
     def get_dimensions(self):
         """Return formatted dimensions."""
         measures = []
-        for k, v in self.measurements.iteritems():
+        for k, v in self.measurements.items():
             data = {
                 'unit': v['unit'],
                 'width': v['width'] or '',
@@ -1229,7 +1222,7 @@ class NatmusItem(object):
         """Return a list of creation places in Swedish."""
         if not self.creation_place:
             return []
-        elif self.creation_place.keys() != ['sv']:
+        elif list(self.creation_place.keys()) != ['sv']:
             pywikibot.warning(
                 "Found unexpected creation_place language: %s" %
                 ', '.join(self.creation_place.keys()))
@@ -1258,11 +1251,12 @@ class NatmusItem(object):
                 'cat': u'Paintings_at_Royal_Domain_of_Drottningholm'
             },
         }
-        for k, v in mappings.iteritems():
+        for k, v in mappings.items():
             if self.image.startswith(k):
                 return v
 
+
 if __name__ == "__main__":
     # run as
-    # python Batches/Nationalmuseum/make_Natmus_info.py -lido_file:Batches/Nationalmuseum/processed_lido.json -image_files:Batches/Nationalmuseum/image_files.txt -nsid_file:Batches/Nationalmuseum/local_nsid_mapping.json
+    # python3 make_Natmus_info.py -lido_file:processed_lido.json -image_files:img/image_files.txt -nsid_file:local_nsid_mapping.json
     NatmusInfo.main()
